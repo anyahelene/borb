@@ -1,14 +1,38 @@
+import Styles from './Styles';
+
 export class BorbElement extends HTMLElement {
   static tag: string;
   constructor() {
     super();
   }
 }
+export class BorbBaseElement extends BorbElement {
+  static tag: string;
+  styles: HTMLStyleElement[];
+  constructor(protected stylesUrls: string[] = []) {
+    super();
+  }
 
-export const prefix = 'borb-';
-export function tagName(name: string, revision: number = 0) {
+  connectedCallback() {
+    if (this.isConnected) {
+      this.styles = this.stylesUrls.map((styleRef) =>
+        Styles.getStyleFor(this, styleRef),
+      );
+    }
+  }
+  disconnectedCallback() {
+    this.styles = this.stylesUrls.map((styleRef) =>
+      Styles.disposeStyle(this, styleRef),
+    );
+  }
+}
+export const borbName = 'borb';
+
+export const borbPrefix = `${borbName}-`;
+
+export function tagName(name: string, revision: number = 0): string {
   const suffix = revision > 0 ? `_${revision}` : '';
-  return `${prefix}${name}${suffix}`;
+  return `${borbPrefix}${name}${suffix}`;
 }
 export function previousTagName(name: string) {
   const m = name.match(/^(.*)_([0-9]+)$/);
@@ -22,6 +46,9 @@ export function previousTagName(name: string) {
   }
 }
 
+export function sysId(url: string) {
+  return `${borbName}/${url.match(/(\w+)\.ts/)[1].toLowerCase()}`;
+}
 export function assert<T>(
   cond: T | (() => T),
   recover: (() => void) | any,
@@ -50,7 +77,8 @@ export function assert<T>(
 export function upgradeElements(eltDef: typeof BorbElement) {
   const previousTag = previousTagName(eltDef.tag);
   if (!previousTag) return;
-  for (const oldElt of document.getElementsByTagName(previousTag)) {
+  console.log('UPGRADING', document.getElementsByTagName(previousTag));
+  for (const oldElt of [...document.getElementsByTagName(previousTag)]) {
     const newElt = new eltDef();
     console.log('upgrading', oldElt, 'to', newElt);
     oldElt.getAttributeNames().forEach((attrName) => {

@@ -40,8 +40,8 @@ class SubSysBuilder<T extends object> {
     if (proto) this.sys.prototype = proto;
   }
 
-  depends(...deps: string[]): this {
-    this._depends.push(...deps);
+  depends(...deps: (string | { _id: string })[]): this {
+    this._depends.push(...deps.map((d) => (typeof d === 'string' ? d : d._id)));
     return this;
   }
 
@@ -175,6 +175,9 @@ export class Dependency<T extends object> {
   }
   static setup(targetObject: any) {
     Dependency.targetObject = targetObject;
+    if (targetObject && !targetObject['borb']) {
+      targetObject['borb'] = { subSystem: _self };
+    }
     let sys = Dependency.queue.shift();
     console.log(Dependency.queue);
     while (sys) {
@@ -242,35 +245,38 @@ export class Dependency<T extends object> {
       const subsystem = this.subsystem;
       this.state = State.STARTING;
       console.log('Starting', this.toString());
-      const start = this.subsystem.start
-        ? (sys: SubSystem<T>, dep: Dependency<T>) => {
-            console.groupCollapsed(
-              `Starting ${this.subsystem.name} rev.${this.subsystem.revision}`,
-            );
+      const start = (sys: SubSystem<T>, dep: Dependency<T>) => {
+        console.groupCollapsed(
+          `Starting ${this.subsystem.name} rev.${this.subsystem.revision}`,
+        );
+        try {
+          (subsystem.customElements ?? []).forEach((eltDef) => {
             try {
-              (subsystem.customElements ?? []).forEach((eltDef) => {
-                console.debug(
-                  'defining custom element %s: %o',
-                  eltDef.tag,
-                  eltDef,
-                );
-                customElements.define(eltDef.tag, eltDef);
-                if (subsystem.revision > 0) {
-                  upgradeElements(eltDef);
-                }
-              });
-              return this.subsystem.start(sys, dep);
-            } finally {
-              console.groupEnd();
+              console.debug(
+                'defining custom element %s: %o',
+                eltDef.tag,
+                eltDef,
+              );
+              customElements.define(eltDef.tag, eltDef);
+              if (subsystem.revision > 0) {
+                upgradeElements(eltDef);
+              }
+            } catch (e) {
+              console.error(e);
             }
-          }
-        : () => Promise.resolve();
+          });
+          return Promise.resolve(this.subsystem.start?.(sys, dep));
+        } finally {
+          console.groupEnd();
+        }
+      };
 
-      Promise.resolve(start(this.subsystem, this)).then(
+      start(this.subsystem, this).then(
         (obj) => {
+          console.log('Started', this.toString());
           this.state = State.STARTED;
           if (obj) this.setApi(obj);
-          console.log('Started', this.toString());
+          else if (subsystem.prototype) this.setApi(subsystem.prototype);
           this.resolve(subsystem);
         },
         (reason) => {
@@ -289,16 +295,32 @@ export class Dependency<T extends object> {
       this.resolve(this.subsystem);
     }
   }
+
   static declare<T extends object>(
-    name: string,
+    nameOrObj: string | (T & { _id: string; _revision?: number }),
     prototype?: T,
     revision = 0,
   ): SubSysBuilder<T> {
-    return new SubSysBuilder(name, prototype, revision);
+    if (typeof nameOrObj === 'string')
+      return new SubSysBuilder(nameOrObj, prototype, revision);
+    else if (nameOrObj._id)
+      return new SubSysBuilder(
+        nameOrObj._id,
+        nameOrObj,
+        nameOrObj._revision ?? revision,
+      );
   }
 }
 
-const self = {
+globalThis.addEventListener?.('DOMContentLoaded', (loadedEvent) => {
+  SubSystem.register({
+    name: 'dom',
+    revision: 0,
+    reloadable: true,
+  });
+});
+
+const _self = {
   debugAll: Dependency.debugAll,
   register: Dependency.register,
   get: Dependency.get,
@@ -307,13 +329,13 @@ const self = {
   waitFor: Dependency.waitFor,
   declare: Dependency.declare,
 };
-export const SubSystem = self;
+export const SubSystem = _self;
 export default SubSystem;
 
-export interface Sys {
-  SubSystem: typeof self;
+export interface BorbSys {
+  subSystem: typeof _self;
 }
 
-declare global {
-  const BORB: Sys;
+declare module './SubSystem' {
+  const BORB: BorbSys;
 }

@@ -1,5 +1,6 @@
 /// <reference types="webpack/module" />
 
+import { sysId } from './Common';
 import SubSystem from './SubSystem';
 
 const subsys_name = 'Styles';
@@ -7,7 +8,7 @@ const revision: number =
   import.meta.webpackHot && import.meta.webpackHot.data
     ? (import.meta.webpackHot.data['revision'] || 0) + 1
     : 0;
-const previousVersion: typeof self =
+const previousVersion: typeof _self =
   import.meta.webpackHot && import.meta.webpackHot.data
     ? import.meta.webpackHot.data['self']
     : undefined;
@@ -16,6 +17,7 @@ interface StylesData {
   styles: Map<string, string>;
   styleNodes: Map<string, HTMLStyleElement>;
   styleStatus: Map<string, string>;
+  styleClones: Map<string, Map<HTMLElement, HTMLStyleElement>>;
 }
 export const data: StylesData = previousVersion
   ? { ...previousVersion.data }
@@ -23,6 +25,7 @@ export const data: StylesData = previousVersion
       styles: new Map<string, string>(),
       styleNodes: new Map<string, HTMLStyleElement>(),
       styleStatus: new Map<string, string>(),
+      styleClones: new Map<string, Map<HTMLElement, HTMLStyleElement>>(),
     };
 export function attach(name: string, listener: (ev: Event) => void): void {
   let node = data.styleNodes.get(name);
@@ -46,7 +49,6 @@ export function detach(name: string, listener: (ev: Event) => void): void {
  * Attach a *change* event listener to the returned node to be notified when the
  * stylesheet is loaded or updated.
  *
- * The style element should be cloned before inserting it into the DOM; make a fresh clone on each change.
  *
  * @param name name/path/url of the stylesheet
  * @returns The associated STYLE element
@@ -58,6 +60,50 @@ export function get(name: string, defaultStyles?: string): HTMLStyleElement {
   }
   return node.cloneNode(true) as HTMLStyleElement;
 }
+export function getStyleFor(
+  elt: HTMLElement,
+  name: string,
+  defaultStyles?: string,
+): HTMLStyleElement {
+  let clones = data.styleClones.get(name);
+  if (!clones) {
+    clones = new Map<HTMLElement, HTMLStyleElement>();
+    data.styleClones.set(name, clones);
+  }
+  let clone = clones.get(elt);
+  if (!clone) {
+    clone = get(name, defaultStyles);
+    clones.set(elt, clone);
+  }
+  console.log('getting style %s for %o: %o', name, elt, clone);
+  return clone;
+}
+export function disposeStyle(elt: HTMLElement, name: string): HTMLStyleElement {
+  let clones = data.styleClones.get(name);
+  if (clones) {
+    console.log('disposing of style %s for %o: %o', name, elt, clones.get(elt));
+    clones.delete(elt);
+    if (clones.size === 0) {
+      data.styleClones.delete(name);
+    }
+  }
+  return null;
+}
+
+export function refreshClones(name: string, node: HTMLStyleElement) {
+  let clones = data.styleClones.get(name);
+  if (clones) {
+    clones.forEach((clone, elt) => {
+      console.log(
+        'updating style %s for %o, style element %o',
+        name,
+        elt,
+        clone,
+      );
+      clone.textContent = node.textContent;
+    });
+  }
+}
 /**
  * (Re)load a stylesheet.
  *
@@ -65,6 +111,8 @@ export function get(name: string, defaultStyles?: string): HTMLStyleElement {
  * The stylesheet is loaded in the background with *fetch()*, will
  * trigger a *change* event on the style element when loading is complete.
  * Will not trigger a new *fetch()* if one is already in progress.
+ *
+ * The style element should be cloned before inserting it into the DOM; make a fresh clone on each change.
  *
  * @param name name/path/url of the stylesheet
  * @returns The associated STYLE element
@@ -101,6 +149,7 @@ export function load(
         data.styles.set(name, txt);
         data.styleStatus.set(name, 'loaded');
         node.textContent = txt;
+        refreshClones(name, node);
         node.dispatchEvent(new Event('change'));
       } else {
         console.warn(`Fetching '${name}': `, resp.status, resp.statusText);
@@ -129,14 +178,24 @@ export function update(name: string): void {
   console.log('updating stylesheet', name);
   load(name, true);
 }
-const self = { get, update, load, attach, detach, data, version: 7 };
+const _self = {
+  _id: sysId(import.meta.url),
+  _revision: revision,
+  get,
+  getStyleFor,
+  disposeStyle,
+  update,
+  load,
+  attach,
+  detach,
+  data,
+  version: 7,
+};
 
-export const Styles = self;
+export const Styles = _self;
 export default Styles;
 
-SubSystem.declare(`borb/${subsys_name.toLowerCase()}`, self, revision)
-  .start((self, dep) => {})
-  .register();
+SubSystem.declare(_self).register();
 
 console.warn('Styles *loaded*!!!!');
 

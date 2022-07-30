@@ -4,7 +4,7 @@ const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const config = {
   target: 'web',
   entry: {
-    index: './src/borb.ts',
+    index: './src/index.ts',
   },
   output: {
     path: path.resolve(__dirname, './dist'),

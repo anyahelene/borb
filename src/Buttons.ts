@@ -1,5 +1,5 @@
 import SubSystem from './SubSystem';
-import { BorbElement, tagName, handleKey } from './Common';
+import { BorbElement, tagName, handleKey, sysId, BorbBaseElement } from './Common';
 import { Hole, html, render } from 'uhtml';
 import { DragNDrop, BorbDragEvent } from './DragNDrop';
 import Styles from './Styles';
@@ -7,7 +7,7 @@ import Mousetrap from 'mousetrap';
 import 'mousetrap/plugins/global-bind/mousetrap-global-bind';
 
 declare module './SubSystem' {
-  interface Sys {
+  interface BorbSys {
     Buttons: typeof _self;
   }
 }
@@ -119,16 +119,12 @@ function loadCommand(element: BorbCommand): Command {
  * @field id The button's unique id
  * @field data-shortcut Default key shortcut
  */
-export class BorbButton extends BorbElement {
+export class BorbButton extends BorbBaseElement {
   static tag = tagName('button');
   _command?: Command;
   clickHandler: (e: Event) => Promise<void>;
-  private _style: HTMLStyleElement;
-  styleChangedHandler: (e: Event) => void;
   constructor() {
-    super();
-    this._style = Styles.get(styleRef);
-    this.styleChangedHandler = (e: Event) => this.styleChanged();
+    super(['css/common.css',styleRef]);
     this.attachShadow({ mode: 'open' });
 
     this.clickHandler = this._clickHandler.bind(this);
@@ -213,13 +209,13 @@ export class BorbButton extends BorbElement {
     }
   }
   connectedCallback() {
+    super.connectedCallback();
     DragNDrop.attachDraggable(this);
-    Styles.attach(styleRef, this.styleChangedHandler);
     this.update();
   }
 
   disconnectedCallback() {
-    Styles.attach(styleRef, this.styleChangedHandler);
+    super.disconnectedCallback();
     DragNDrop.detachDraggable(this);
   }
 
@@ -229,11 +225,7 @@ export class BorbButton extends BorbElement {
     // console.log('element attributes changed.', name, oldValue, newValue);
     this.update();
   }
-  styleChanged() {
-    this._style = Styles.get(styleRef);
-    this.update();
-    //console.log('style changed', this, styleRef, this._style);
-  }
+
   template() {
     const command = this.command;
     const text = command.text;
@@ -260,7 +252,7 @@ export class BorbButton extends BorbElement {
       Mousetrap.bindGlobal(shortcut, this.clickHandler);
 
     //console.log(this.id, command, icon, shortcut, shortcutText, keys);
-    return html`${this._style}
+    return html`${this.styles}
       <button
         id="${this.id}"
         onclick=${this.clickHandler}
@@ -279,6 +271,8 @@ export class BorbButton extends BorbElement {
 }
 
 const _self = {
+  _id: sysId(import.meta.url),
+  _revision: revision,
   BorbButton,
   BorbCommand,
   commands,
@@ -290,7 +284,6 @@ export default Buttons;
 
 SubSystem.declare('borb/buttons', _self, revision)
   .reloadable(false)
-  .depends('dom', 'borb/styles')
+  .depends('dom', Styles)
   .elements(BorbButton, BorbCommand)
-  .start((self, dep) => {})
   .register();

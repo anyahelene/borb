@@ -1,16 +1,10 @@
-import SubSystem from '../SubSystem';
-import { Hole, html, render } from "uhtml";
-import { turtleduck } from '../TurtleDuck';
-import { BorbElement, tagName, assert } from './Borb';
-import { data } from './Styles';
-import IndexedMap from './IndexedMap';
-import { uniqueId } from 'lodash-es';
-import exports from 'webpack';
-//import 'css/frames.css';
+import SubSystem from './SubSystem';
+import { BorbElement, sysId, tagName, uniqueId } from './Common';
+import { html, render } from 'uhtml';
+import Styles from './Styles';
 
-const subsys_name = 'SUBSYSTEM';
 const revision: number = import.meta.webpackHot && import.meta.webpackHot.data ? import.meta.webpackHot.data['revision'] + 1 : 0;
-const previousVersion: typeof self = import.meta.webpackHot && import.meta.webpackHot.data ? import.meta.webpackHot.data['self'] : undefined;
+const previousVersion: typeof _self = import.meta.webpackHot && import.meta.webpackHot.data ? import.meta.webpackHot.data['self'] : undefined;
 
 
 class STATE {
@@ -21,31 +15,26 @@ class STATE {
 
 const stateHolder : STATE = new STATE(previousVersion.stateHolder);
 
-const self = { STATE, stateHolder};
-export const SUBSYSTEM = self;
+const _self = {
+    _id: sysId(import.meta.url),
+    _revision: revision,
+    STATE,
+    stateHolder
+};
+export const SUBSYSTEM = _self;
 export default SUBSYSTEM;
 
-SubSystem.declare(`borb/${subsys_name.toLowerCase()}`, self)
-    .depends('dom')
-    .start((self, dep) => {
-        console.groupCollapsed("defining ${subsys_name}:");
-        try {
-
-        } finally {
-            console.groupEnd();
-        }
-    })
+SubSystem.declare(_self)
+    .reloadable(true)
+    .depends('dom', Styles)
+    .elements()
     .register();
-
 
 if (import.meta.webpackHot) {
     import.meta.webpackHot.accept();
-    // import.meta.webpackHot.accept(styleRef, () => {
-    //     turtleduck.styles.update(styleRef);
-    // });
-    import.meta.webpackHot.addDisposeHandler(data => {
-        console.warn(`Unloading ${subsys_name}`);
+    import.meta.webpackHot.addDisposeHandler((data) => {
+        console.warn(`Unloading ${_self._id}`);
         data['revision'] = revision;
-        data['self'] = self;
+        data['self'] = _self;
     });
 }

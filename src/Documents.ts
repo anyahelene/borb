@@ -1,5 +1,5 @@
 import SubSystem from './SubSystem';
-import { BorbElement, tagName, uniqueId } from './Common';
+import { BorbBaseElement, BorbElement, sysId, tagName, uniqueId } from './Common';
 import { Hole, html, render } from 'uhtml';
 import { MDRender } from './MDRender';
 import Styles from './Styles';
@@ -15,20 +15,18 @@ const previousVersion: typeof _self =
     : undefined;
 const styleRef = 'css/markdown.css';
 
-export class BorbDocument extends HTMLElement {
+export class BorbDocument extends BorbBaseElement {
   static tag = tagName('document', revision);
   textElement: HTMLElement;
-  _style: HTMLStyleElement;
   filename: string;
   mdRender: any;
   srcText?: string;
-  _styleChangedHandler = () => this.styleChanged();
   _observer = new MutationObserver((muts) => this.update());
   _docChanged: boolean = true;
   _doUpdate: boolean = false;
   scrollElement: HTMLDivElement;
   constructor() {
-    super();
+    super(['css/common.css', styleRef]);
     // hack to make it work with legacy MDRender
     this.scrollElement = document.createElement('div');
     this.scrollElement.classList.add('doc-display');
@@ -128,7 +126,7 @@ export class BorbDocument extends HTMLElement {
     } else {
       this.textElement.textContent = '';
     }
-    render(this.shadowRoot, html`${this._style || ''}${this.scrollElement}`);
+    render(this.shadowRoot, html`${this.styles || ''}${this.scrollElement}`);
   }
 
   closeHandler(ev: Event) {
@@ -145,6 +143,7 @@ export class BorbDocument extends HTMLElement {
   select(): void {}
 
   connectedCallback() {
+    super.connectedCallback();
     if (this.isConnected) {
       if (!this.shadowRoot) {
         this.attachShadow({ mode: 'open' });
@@ -161,12 +160,12 @@ export class BorbDocument extends HTMLElement {
       });
 
       uniqueId('document', this);
-      Styles.attach(styleRef, this._styleChangedHandler);
       this.queueUpdate(true);
     }
   }
 
   disconnectedCallback() {
+    super.disconnectedCallback();
     this._observer.disconnect();
     console.log(
       'element  removed from page.',
@@ -174,14 +173,9 @@ export class BorbDocument extends HTMLElement {
       this.isConnected,
       this.shadowRoot,
     );
-    Styles.detach(styleRef, this._styleChangedHandler);
   }
 
-  styleChanged() {
-    this._style = Styles.get(styleRef);
-    this.update();
-    console.log('style changed', this, styleRef, this._style);
-  }
+
   queueUpdate(docChanged = false) {
     this._docChanged ||= docChanged;
     if (!this._doUpdate) {
@@ -191,25 +185,26 @@ export class BorbDocument extends HTMLElement {
   }
 }
 
-const _self = { BorbDocument, styleRef, revision };
+const _self = {
+  _id: sysId(import.meta.url),
+  _revision: revision,
+  BorbDocument,
+  styleRef,
+};
 export const Documents = _self;
 
 export default Documents;
 
-SubSystem.declare(`borb/${subsys_name.toLowerCase()}`, _self, revision)
+SubSystem.declare(_self)
   .reloadable(true)
-  .depends('dom', 'borb/styles')
+  .depends('dom', Styles)
   .elements(BorbDocument)
-  .start((self, dep) => {})
   .register();
 
 if (import.meta.webpackHot) {
   import.meta.webpackHot.accept();
-  // import.meta.webpackHot.accept(styleRef, () => {
-  //     turtleduck.styles.update(styleRef);
-  // });
   import.meta.webpackHot.addDisposeHandler((data) => {
-    console.warn(`Unloading ${subsys_name}`);
+    console.warn(`Unloading ${_self._id}`);
     data['revision'] = revision;
     data['self'] = _self;
     console.log(previousVersion?.BorbDocument.tag, BorbDocument.tag);
