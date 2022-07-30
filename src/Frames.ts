@@ -1,6 +1,14 @@
 import { BORB, SubSystem, BorbSys } from './SubSystem';
 import { html, render } from 'uhtml';
-import { BorbElement, tagName, assert, uniqueId, borbPrefix,  sysId, BorbBaseElement } from './Common';
+import {
+    BorbElement,
+    tagName,
+    assert,
+    uniqueId,
+    borbPrefix,
+    sysId,
+    BorbBaseElement,
+} from './Common';
 import { isEqual } from 'lodash-es';
 import { DragNDrop, BorbDragEvent } from './DragNDrop';
 import Styles from './Styles';
@@ -122,7 +130,12 @@ class FrameDragState {
                 (e as any).layerY,
             );
         } else if (e.type == 'dragenter' && dataTransfer) {
-            console.info('drag enter', e.currentTarget === e.target, this._count, e);
+            console.info(
+                'drag enter',
+                e.currentTarget === e.target,
+                this._count,
+                e,
+            );
             if (
                 this._count === 0 &&
                 dataTransfer.getData('application/x-borb-tabpanel')
@@ -132,7 +145,12 @@ class FrameDragState {
             }
             this._count++;
         } else if (e.type == 'dragleave') {
-            console.info('drag leave', e.currentTarget === e.target, this._count, e);
+            console.info(
+                'drag leave',
+                e.currentTarget === e.target,
+                this._count,
+                e,
+            );
             this._count--;
             console.log(this._count);
             if (this._count === 0) {
@@ -143,9 +161,9 @@ class FrameDragState {
             this.endDropAttempt();
         }
     }
-    enter(ev: BorbDragEvent, dest: BorbFrame) { }
+    enter(ev: BorbDragEvent, dest: BorbFrame) {}
 
-    leave(ev: BorbDragEvent, dest: BorbFrame) { }
+    leave(ev: BorbDragEvent, dest: BorbFrame) {}
 
     canDropTo(dest: BorbFrame): boolean {
         return false;
@@ -289,14 +307,19 @@ export class BorbFrame extends BorbBaseElement {
             <nav class="window-tools"><button class="min-button">${minIcon}</button><button class="max-button">${maxIcon}</button></nav></header>`;
         this._header.dataset.drop = 'true';
         this._header.addEventListener('borbdragenter', (ev: BorbDragEvent) => {
-            if (ev.dragSource instanceof TabEntry && ev.dragSource.canDropTo(this)) {
+            if (
+                ev.dragSource instanceof TabEntry &&
+                ev.dragSource.canDropTo(this)
+            ) {
                 console.log('FRAME enter', this.frameName, ev.target, ev);
                 ev.allowDrop('move');
                 if (ev.target === ev.dragSource) {
                     // do nothing
                 } else if (ev.target instanceof TabEntry) {
                     ev.target.insertAdjacentElement(
-                        ev.dragSource.isLeftOf(ev.target) ? 'afterend' : 'beforebegin',
+                        ev.dragSource.isLeftOf(ev.target)
+                            ? 'afterend'
+                            : 'beforebegin',
                         ev.dragSource,
                     );
                 } else {
@@ -387,11 +410,11 @@ export class BorbFrame extends BorbBaseElement {
             render(
                 this.shadowRoot,
                 html`${this.styles}${this._header}
-        ${this.classList.contains('no-tabs')
-                        ? html`<slot></slot>`
-                        : html`<slot name=${this.selected?.panel.slot || '<none>'}
-              ><div class="empty-slot"></div
-            ></slot>`}`,
+                ${this.classList.contains('no-tabs')
+                    ? html`<slot></slot>`
+                    : html`<slot name=${this.selected?.panel.slot || '<none>'}
+                          ><div class="empty-slot"></div
+                      ></slot>`}`,
             );
         } catch (ex) {
             console.error('Frame.update', this, ex);
@@ -587,4 +610,3 @@ if (import.meta.webpackHot) {
         data['Frames'] = Frames;
     });
 }
-

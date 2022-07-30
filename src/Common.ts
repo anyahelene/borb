@@ -1,94 +1,94 @@
 import Styles from './Styles';
 
 export class BorbElement extends HTMLElement {
-  static tag: string;
-  constructor() {
-    super();
-  }
+    static tag: string;
+    constructor() {
+        super();
+    }
 }
 export class BorbBaseElement extends BorbElement {
-  static tag: string;
-  styles: HTMLStyleElement[];
-  constructor(protected stylesUrls: string[] = []) {
-    super();
-  }
-
-  connectedCallback() {
-    if (this.isConnected) {
-      this.styles = this.stylesUrls.map((styleRef) =>
-        Styles.getStyleFor(this, styleRef),
-      );
+    static tag: string;
+    styles: HTMLStyleElement[];
+    constructor(protected stylesUrls: string[] = []) {
+        super();
     }
-  }
-  disconnectedCallback() {
-    this.styles = this.stylesUrls.map((styleRef) =>
-      Styles.disposeStyle(this, styleRef),
-    );
-  }
+
+    connectedCallback() {
+        if (this.isConnected) {
+            this.styles = this.stylesUrls.map((styleRef) =>
+                Styles.getStyleFor(this, styleRef),
+            );
+        }
+    }
+    disconnectedCallback() {
+        this.styles = this.stylesUrls.map((styleRef) =>
+            Styles.disposeStyle(this, styleRef),
+        );
+    }
 }
 export const borbName = 'borb';
 
 export const borbPrefix = `${borbName}-`;
 
 export function tagName(name: string, revision: number = 0): string {
-  const suffix = revision > 0 ? `_${revision}` : '';
-  return `${borbPrefix}${name}${suffix}`;
+    const suffix = revision > 0 ? `_${revision}` : '';
+    return `${borbPrefix}${name}${suffix}`;
 }
 export function previousTagName(name: string) {
-  const m = name.match(/^(.*)_([0-9]+)$/);
-  if (m) {
-    const rev = parseInt(m[2]);
-    if (rev === 1) {
-      return m[1];
-    } else {
-      return `${m[1]}_${rev - 1}`;
+    const m = name.match(/^(.*)_([0-9]+)$/);
+    if (m) {
+        const rev = parseInt(m[2]);
+        if (rev === 1) {
+            return m[1];
+        } else {
+            return `${m[1]}_${rev - 1}`;
+        }
     }
-  }
 }
 
 export function sysId(url: string) {
-  return `${borbName}/${url.match(/(\w+)\.ts/)[1].toLowerCase()}`;
+    return `${borbName}/${url.match(/(\w+)\.ts/)[1].toLowerCase()}`;
 }
 export function assert<T>(
-  cond: T | (() => T),
-  recover: (() => void) | any,
-  ...args: any[]
+    cond: T | (() => T),
+    recover: (() => void) | any,
+    ...args: any[]
 ): T {
-  if (typeof cond === 'function') {
-    cond = (cond as () => T)();
-  }
-  if (typeof recover !== 'function') {
-    args = [recover, ...args];
-    recover = undefined;
-  }
-  if (!cond) {
-    console.error('Assertion failed: ', ...args);
-    if (recover) {
-      try {
-        recover();
-      } catch (e) {
-        console.error('   also, recovery function failed: ', e);
-      }
+    if (typeof cond === 'function') {
+        cond = (cond as () => T)();
     }
-  }
-  return cond;
+    if (typeof recover !== 'function') {
+        args = [recover, ...args];
+        recover = undefined;
+    }
+    if (!cond) {
+        console.error('Assertion failed: ', ...args);
+        if (recover) {
+            try {
+                recover();
+            } catch (e) {
+                console.error('   also, recovery function failed: ', e);
+            }
+        }
+    }
+    return cond;
 }
 
 export function upgradeElements(eltDef: typeof BorbElement) {
-  const previousTag = previousTagName(eltDef.tag);
-  if (!previousTag) return;
-  console.log('UPGRADING', document.getElementsByTagName(previousTag));
-  for (const oldElt of [...document.getElementsByTagName(previousTag)]) {
-    const newElt = new eltDef();
-    console.log('upgrading', oldElt, 'to', newElt);
-    oldElt.getAttributeNames().forEach((attrName) => {
-      console.log('set', attrName, oldElt.getAttribute(attrName));
-      newElt.setAttribute(attrName, oldElt.getAttribute(attrName));
-    });
-    newElt.replaceChildren(...oldElt.childNodes);
-    console.log('replacedChildren:', newElt.children);
-    oldElt.parentElement.replaceChild(newElt, oldElt);
-  }
+    const previousTag = previousTagName(eltDef.tag);
+    if (!previousTag) return;
+    console.log('UPGRADING', document.getElementsByTagName(previousTag));
+    for (const oldElt of [...document.getElementsByTagName(previousTag)]) {
+        const newElt = new eltDef();
+        console.log('upgrading', oldElt, 'to', newElt);
+        oldElt.getAttributeNames().forEach((attrName) => {
+            console.log('set', attrName, oldElt.getAttribute(attrName));
+            newElt.setAttribute(attrName, oldElt.getAttribute(attrName));
+        });
+        newElt.replaceChildren(...oldElt.childNodes);
+        console.log('replacedChildren:', newElt.children);
+        oldElt.parentElement.replaceChild(newElt, oldElt);
+    }
 }
 
 let unique = 0;
@@ -99,39 +99,39 @@ let unique = 0;
  * @return the base prefix, or a fresh unique id if elts is empty
  */
 export function uniqueId(...strOrElts: (Element | string)[]): string {
-  let prefix = '_';
-  if (
-    typeof strOrElts[0] === 'string' &&
-    typeof strOrElts[1] in ['undefined', 'string']
-  ) {
-    prefix = strOrElts.shift() as string;
-  }
-  let suffix = '_';
-  for (const elt of strOrElts) {
-    if (typeof elt === 'string') {
-      suffix = elt;
-    } else if (elt && !elt.id) {
-      elt.id = `${prefix}${suffix}${unique++}`;
+    let prefix = '_';
+    if (
+        typeof strOrElts[0] === 'string' &&
+        typeof strOrElts[1] in ['undefined', 'string']
+    ) {
+        prefix = strOrElts.shift() as string;
     }
-  }
-  return `${prefix}${suffix}${unique++}`;
+    let suffix = '_';
+    for (const elt of strOrElts) {
+        if (typeof elt === 'string') {
+            suffix = elt;
+        } else if (elt && !elt.id) {
+            elt.id = `${prefix}${suffix}${unique++}`;
+        }
+    }
+    return `${prefix}${suffix}${unique++}`;
 }
 
 let keyhandler: (
-  key: string,
-  button?: HTMLElement,
-  event?: Event,
+    key: string,
+    button?: HTMLElement,
+    event?: Event,
 ) => Promise<any> = (key) => Promise.resolve();
 export function setKeyHandler(
-  handler: (key: string, button?: HTMLElement, event?: Event) => Promise<any>,
+    handler: (key: string, button?: HTMLElement, event?: Event) => Promise<any>,
 ) {
-  keyhandler = handler;
+    keyhandler = handler;
 }
 
 export function handleKey(
-  key: string,
-  button?: HTMLElement,
-  event?: Event,
+    key: string,
+    button?: HTMLElement,
+    event?: Event,
 ): Promise<any> {
-  return keyhandler(key, button, event);
+    return keyhandler(key, button, event);
 }
