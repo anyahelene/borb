@@ -1,16 +1,9 @@
 import SubSystem from './SubSystem';
-import {
-    BorbBaseElement,
-    BorbElement,
-    sysId,
-    tagName,
-    uniqueId,
-} from './Common';
-import { Hole, html, render } from 'uhtml';
+import { BorbBaseElement, sysId, tagName, uniqueId } from './Common';
+import { html, render } from 'uhtml';
 import { MDRender } from './MDRender';
 import Styles from './Styles';
 
-const subsys_name = 'Documents';
 const revision: number =
     import.meta.webpackHot && import.meta.webpackHot.data
         ? import.meta.webpackHot.data['revision'] + 1
@@ -25,11 +18,11 @@ export class BorbDocument extends BorbBaseElement {
     static tag = tagName('document', revision);
     textElement: HTMLElement;
     filename: string;
-    mdRender: any;
+    mdRender: { render_unsafe(elt: HTMLElement, text: string): void };
     srcText?: string;
-    _observer = new MutationObserver((muts) => this.update());
-    _docChanged: boolean = true;
-    _doUpdate: boolean = false;
+    _observer = new MutationObserver((_muts) => this.update());
+    _docChanged = true;
+    _doUpdate = false;
     scrollElement: HTMLDivElement;
     constructor() {
         super(['css/common.css', styleRef]);
@@ -73,11 +66,11 @@ export class BorbDocument extends BorbBaseElement {
         this.filename = filename;
         this.engine(filename).render_unsafe(this.textElement, text ?? '');
     }
-    engine(url: URL | string): any {
+    engine(url: URL | string) {
         if (!this.mdRender) {
             this.mdRender = new MDRender({
                 html: true,
-                hrefPrefix: `${url}`.replace(/[^\/]*$/, ''),
+                hrefPrefix: `${url}`.replace(/[^/]*$/, ''),
             });
         }
         return this.mdRender;
@@ -158,7 +151,9 @@ export class BorbDocument extends BorbBaseElement {
     focus(options?: FocusOptions) {
         super.focus(options);
     }
-    select(): void {}
+    select(): void {
+        //
+    }
 
     connectedCallback() {
         super.connectedCallback();

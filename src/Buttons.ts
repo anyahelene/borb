@@ -6,6 +6,7 @@ import {
     sysId,
     BorbBaseElement,
 } from './Common';
+
 import { Hole, html, render } from 'uhtml';
 import { DragNDrop, BorbDragEvent } from './DragNDrop';
 import Styles from './Styles';
@@ -17,7 +18,6 @@ declare module './SubSystem' {
         Buttons: typeof _self;
     }
 }
-const subsys_name = 'Buttons';
 const revision: number =
     import.meta.webpackHot && import.meta.webpackHot.data
         ? import.meta.webpackHot.data['revision'] + 1
@@ -34,9 +34,8 @@ export interface Command {
     icon?: string;
     text?: string;
     shortcut?: string;
-    [propName: string]: any;
+    [propName: string]: unknown;
 }
-let uniqueId = 0;
 /** maps name to command object */
 const commands: { [cmdName: string]: Command } = {};
 /** maps button id to command name */
@@ -65,7 +64,7 @@ const keyboardSymbols: { [keyName: string]: string } = {
  */
 export class BorbCommand extends BorbElement {
     static tag = tagName('command');
-    name: string = '';
+    name = '';
     constructor() {
         super();
     }
@@ -225,10 +224,8 @@ export class BorbButton extends BorbBaseElement {
         DragNDrop.detachDraggable(this);
     }
 
-    adoptedCallback() {}
-
     attributeChangedCallback(name: string, oldValue: string, newValue: string) {
-        // console.log('element attributes changed.', name, oldValue, newValue);
+        console.log('element attributes changed.', name, oldValue, newValue);
         this.update();
     }
 
@@ -248,9 +245,7 @@ export class BorbButton extends BorbBaseElement {
         const keys = shortcut
             .split('+')
             .map((s) => html`<span>${keyboardSymbols[s] || s}</span>`);
-        const shortcutText = shortcut
-            .replace('ctrl+', '⌘')
-            .replace('shift+', '↑');
+
         const classList = `${icon ? 'has-icon' : 'no-icon'} ${
             text ? 'has-text' : 'no-text'
         }`;

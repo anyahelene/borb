@@ -3,7 +3,6 @@
 import { sysId } from './Common';
 import SubSystem from './SubSystem';
 
-const subsys_name = 'Styles';
 const revision: number =
     import.meta.webpackHot && import.meta.webpackHot.data
         ? (import.meta.webpackHot.data['revision'] || 0) + 1
@@ -79,7 +78,7 @@ export function getStyleFor(
     return clone;
 }
 export function disposeStyle(elt: HTMLElement, name: string): HTMLStyleElement {
-    let clones = data.styleClones.get(name);
+    const clones = data.styleClones.get(name);
     if (clones) {
         console.log(
             'disposing of style %s for %o: %o',
@@ -96,7 +95,7 @@ export function disposeStyle(elt: HTMLElement, name: string): HTMLStyleElement {
 }
 
 export function refreshClones(name: string, node: HTMLStyleElement) {
-    let clones = data.styleClones.get(name);
+    const clones = data.styleClones.get(name);
     if (clones) {
         clones.forEach((clone, elt) => {
             console.log(

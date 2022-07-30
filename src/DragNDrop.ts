@@ -5,10 +5,6 @@ const revision: number =
     import.meta.webpackHot && import.meta.webpackHot.data
         ? import.meta.webpackHot.data['revision'] + 1
         : 0;
-const previousVersion: typeof self =
-    import.meta.webpackHot && import.meta.webpackHot.data
-        ? import.meta.webpackHot.data['self']
-        : undefined;
 
 interface DropZone {
     query: string;
@@ -173,7 +169,7 @@ function targetElement(tgt: EventTarget): HTMLElement {
     return elt;
 }
 function dropTarget(elt: HTMLElement, zoneSpec: DropZone): HTMLElement {
-    let query = zoneSpec?.query ?? '[data-drop]';
+    const query = zoneSpec?.query ?? '[data-drop]';
     elt = elt.closest(query);
     console.log('dropTarget', query, elt);
     // if (elt && dragState.offsets && elt === dragState.dragSource) {
@@ -244,10 +240,7 @@ const _dragenter = (ev: DragEvent) => handlers().dragenter(ev),
     _dragstart = (ev: DragEvent) => handlers().dragstart(ev),
     _dragend = (ev: DragEvent) => handlers().dragend(ev);
 
-export function attachDropZone(
-    elt: HTMLElement,
-    query: string = '[data-drop]',
-) {
+export function attachDropZone(elt: HTMLElement, query = '[data-drop]') {
     dropZones.set(elt, { query });
     elt.addEventListener('dragenter', _dragenter);
     elt.addEventListener('dragleave', _dragleave);
@@ -306,7 +299,6 @@ function dragend(ev: DragEvent) {
     dragState.reset();
 }
 function dragenter(ev: DragEvent) {
-    const hue = dragState.count * 15;
     const target = targetElement(ev.target);
     const drop = dropTarget(
         target,

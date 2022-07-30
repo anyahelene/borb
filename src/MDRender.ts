@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Remarkable, utils } from './remarkable';
 /// <reference path="../../../../node_modules/highlight.js/types/index.d.ts" />
 import hljs from 'highlight.js/lib/core';
@@ -32,9 +33,9 @@ console.warn('REMARKABLE', Remarkable, utils);
 	nested within. Nodes are removed from `rootElt` and added to `destElt` */
 function doc2tree(rootElt: HTMLElement, destElt: HTMLElement) {
     destElt.innerHTML = '';
-    var current = destElt;
-    var count = 0;
-    var title = '';
+    let current = destElt;
+    let count = 0;
+    let title = '';
     const stack = [destElt];
     const path = [];
 
@@ -44,8 +45,8 @@ function doc2tree(rootElt: HTMLElement, destElt: HTMLElement) {
             newSection.id = elt.id;
             elt.id = undefined;
         }
-        var parent = null;
-        for (var i = stack.length - 1; parent == null && i >= 0; i--) {
+        let parent = null;
+        for (let i = stack.length - 1; parent == null && i >= 0; i--) {
             parent = stack[i];
         }
         parent.appendChild(newSection);
@@ -58,7 +59,7 @@ function doc2tree(rootElt: HTMLElement, destElt: HTMLElement) {
 
     Array.from(rootElt.childNodes).forEach((elt: HTMLElement) => {
         //console.log('doc2tree:', 'current', current, 'stack', stack, 'looking at', elt.innerHTML || elt.textContent);
-        var m;
+        let m;
         if ((m = elt.nodeName.match(/^H([123456])$/)) != null) {
             const level = parseInt(m[1]);
             if (!title && level === 1) {
@@ -129,21 +130,21 @@ function makeToc(doc, elt, scroller) {
     if (!scroller) return [null, null, null];
     const headers = [];
     const sections = {};
-    var i = 1;
+    let i = 1;
     const toc = document.createElement('ol');
     toc.className = 'table-of-contents';
     const listener = makeScrollToListener(elt, scroller);
     doc.querySelectorAll('h1, h2').forEach((head) => {
         headers.push(head);
         const a = head.querySelector('slug');
-        var title = head.textContent;
+        let title = head.textContent;
         //console.log('title', title);
         if (a) {
             title = a.textContent;
             a.remove();
             //console.log("title", title);
         }
-        const slug = `_${i}_${slugify(title)}`;
+        const slug = `_${i++}_${slugify(title)}`;
         //console.log('slug', slug);
         head.id = slug;
         const item = document.createElement('li');
@@ -228,7 +229,7 @@ class MDRender {
             },
         );
 
-        var scroller = elt.closest('.doc-display');
+        const scroller = elt.closest('.doc-display');
 
         const [toc, headers, sections] = makeToc(doc, elt, scroller);
 
@@ -311,11 +312,11 @@ class MDRender {
         });
         elt.querySelectorAll('button[data-snippet]').forEach((btn) => {
             const snip = this._snippets[parseInt(btn.dataset.snippet)];
-            var code = snip.code;
+            let code = snip.code;
             if (snip.language === 'python') {
                 if (snip.code.startsWith('>>> ')) {
                     code = '';
-                    var mode = '';
+                    let mode = '';
                     snip.code.split('\n').forEach((line) => {
                         if (
                             line.startsWith('>>> ') ||
@@ -388,12 +389,11 @@ class MDRender {
     }
 
     _remarkableHighlight() {
-        const md = this;
-        return function (str: string, lang: string, opts?: string) {
+        return (str: string, lang: string, opts?: string) => {
             console.log('Highlight: ', lang, opts);
             if (lang && hljs.getLanguage(lang)) {
                 try {
-                    md._snippets.push({
+                    this._snippets.push({
                         language: lang,
                         code: str,
                         opts: opts,
@@ -418,12 +418,11 @@ class MDRender {
     }
 
     _render_fence(old) {
-        const md = this;
-        return function (tokens, idx, options, env, instance) {
-            const l = md._snippets.length;
-            var r = old(tokens, idx, options, env, instance);
+        return (tokens, idx, options, env, instance) => {
+            const l = this._snippets.length;
+            let r = old(tokens, idx, options, env, instance);
             //console.log('fence:', tokens[idx].params, r);
-            if (l != md._snippets.length) {
+            if (l != this._snippets.length) {
                 const btn = `<nav class="toolbar"><button class="insert" type="button" data-action="insert" data-snippet="${l}"></button></nav>`;
                 const m = r.match(/^([\s\S]*?)(<\/pre>|)(\s*)$/);
                 if (m != null) {
@@ -443,10 +442,10 @@ class MDRender {
                       utils.replaceEntities(link.title),
                   )}"`
                 : '';
-            var target = options.linkTarget
+            let target = options.linkTarget
                 ? ` target="${options.linkTarget}"`
                 : '';
-            var href = link.href;
+            let href = link.href;
             //console.log("link_open", link);
             const m = href.match(/^(insert|focus|open|run|save|snap|qrscan):/);
             if (m != null) {
@@ -462,13 +461,13 @@ class MDRender {
 
     _render_image(old) {
         return function (tokens, idx, options /*, env */) {
-            var src = tokens[idx].src;
+            let src = tokens[idx].src;
             if (src.match(/^\w[\w\d+.-]*:/) == null) {
                 src = options.hrefPrefix + src;
             }
             //console.log("image", tokens[idx]);
             src = ` src="${utils.escapeHtml(src)}"`;
-            var alt = ` alt="${
+            const alt = ` alt="${
                 tokens[idx].alt
                     ? utils.escapeHtml(
                           utils.replaceEntities(
@@ -477,12 +476,12 @@ class MDRender {
                       )
                     : ''
             }"`;
-            var style = tokens[idx].style
+            const style = tokens[idx].style
                 ? ` class="${tokens[idx].style}"`
                 : '';
-            var suffix = options.xhtmlOut ? ' /' : '';
+            const suffix = options.xhtmlOut ? ' /' : '';
             if (tokens[idx].figure) {
-                var title = '';
+                let title = '';
                 if (tokens[idx].title === '<') {
                     return `<aside class="left small"><figure><img ${src}${alt}${suffix}></figure></aside>`;
                 } else if (tokens[idx].title) {
@@ -496,7 +495,7 @@ class MDRender {
                 }
                 return `<aside ${style}><figure><img${src}${alt}${suffix}>${title}</figure></aside>`;
             } else {
-                var title = tokens[idx].title
+                const title = tokens[idx].title
                     ? ` title="${utils.escapeHtml(
                           utils.replaceEntities(tokens[idx].title),
                       )}"`

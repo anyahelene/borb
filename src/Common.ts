@@ -30,7 +30,7 @@ export const borbName = 'borb';
 
 export const borbPrefix = `${borbName}-`;
 
-export function tagName(name: string, revision: number = 0): string {
+export function tagName(name: string, revision = 0): string {
     const suffix = revision > 0 ? `_${revision}` : '';
     return `${borbPrefix}${name}${suffix}`;
 }
@@ -51,8 +51,8 @@ export function sysId(url: string) {
 }
 export function assert<T>(
     cond: T | (() => T),
-    recover: (() => void) | any,
-    ...args: any[]
+    recover: (() => void) | unknown,
+    ...args: unknown[]
 ): T {
     if (typeof cond === 'function') {
         cond = (cond as () => T)();
@@ -63,7 +63,7 @@ export function assert<T>(
     }
     if (!cond) {
         console.error('Assertion failed: ', ...args);
-        if (recover) {
+        if (typeof recover === 'function') {
             try {
                 recover();
             } catch (e) {
@@ -121,9 +121,13 @@ let keyhandler: (
     key: string,
     button?: HTMLElement,
     event?: Event,
-) => Promise<any> = (key) => Promise.resolve();
+) => Promise<unknown> = (key) => Promise.resolve();
 export function setKeyHandler(
-    handler: (key: string, button?: HTMLElement, event?: Event) => Promise<any>,
+    handler: (
+        key: string,
+        button?: HTMLElement,
+        event?: Event,
+    ) => Promise<unknown>,
 ) {
     keyhandler = handler;
 }
@@ -132,6 +136,6 @@ export function handleKey(
     key: string,
     button?: HTMLElement,
     event?: Event,
-): Promise<any> {
+): Promise<unknown> {
     return keyhandler(key, button, event);
 }

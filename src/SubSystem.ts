@@ -1,12 +1,12 @@
 import { BorbElement, upgradeElements } from './Common';
 
+// eslint-disable no-unused-vars
 enum State {
     STOPPED,
     WAITING,
     STARTING,
     STARTED,
 }
-
 export interface SubSystem<T extends object> {
     customElements?: typeof BorbElement[];
     name: string;
@@ -14,7 +14,7 @@ export interface SubSystem<T extends object> {
     start?(
         self: SubSystem<T>,
         dep: Dependency<T>,
-    ): Promise<object | void> | object | void;
+    ): Promise<T | void> | T | void;
     stop?(): Promise<void> | void;
     api?: T;
     prototype?: T;
@@ -56,7 +56,7 @@ class SubSysBuilder<T extends object> {
         handler: (
             self: SubSystem<T>,
             dep: Dependency<T>,
-        ) => Promise<T | void> | object | void,
+        ) => Promise<T | void> | T | void,
     ): this {
         this.sys.start = handler;
         return this;
@@ -86,17 +86,19 @@ class SubSysBuilder<T extends object> {
         return this;
     }
 }
+function nop() {
+    //
+}
 export class Dependency<T extends object> {
     public static targetObject: TargetObject;
     private static counter = 0;
     private static systems = new Map<string, Dependency<object>>();
     private static queue: SubSystem<object>[] = [];
-    private promise: Promise<SubSystem<T>>;
-    private resolve: (value: SubSystem<T> | PromiseLike<SubSystem<T>>) => void =
-        (v) => {};
-    private reject: (reason: Error) => void = (r) => {};
-    private deps: Set<Dependency<object>> = new Set();
-    private id: number = Dependency.counter++;
+    promise: Promise<SubSystem<T>>;
+    resolve: (value: SubSystem<T> | PromiseLike<SubSystem<T>>) => void = nop;
+    reject: (reason: Error) => void = nop;
+    deps: Set<Dependency<object>> = new Set();
+    id: number = Dependency.counter++;
 
     private _name: string;
     public get name(): string {
@@ -107,7 +109,7 @@ export class Dependency<T extends object> {
     public get api(): T | undefined {
         return this._api;
     }
-    private state: State = State.STOPPED;
+    private state = State.STOPPED;
     private subsystem?: SubSystem<T>;
     constructor(name: string) {
         this._name = name;
@@ -123,7 +125,7 @@ export class Dependency<T extends object> {
     }
 
     dependents(): Set<Dependency<object>> {
-        let result: Set<Dependency<object>> = new Set();
+        const result: Set<Dependency<object>> = new Set();
         Dependency.systems.forEach((sys) => {
             if (sys.deps.has(this)) {
                 result.add(sys);
@@ -174,7 +176,7 @@ export class Dependency<T extends object> {
         const sys = Dependency.get(sysName) as Dependency<T>;
         return sys._api;
     }
-    static setup(targetObject: any) {
+    static setup(targetObject: TargetObject) {
         Dependency.targetObject = targetObject;
         if (targetObject && !targetObject['borb']) {
             targetObject['borb'] = { subSystem: _self };
@@ -204,7 +206,7 @@ export class Dependency<T extends object> {
         }
         depsys.deps.clear();
         const depends = sys.depends ?? [];
-        for (let d of depends) {
+        for (const d of depends) {
             depsys.deps.add(Dependency.get(d));
         }
 
@@ -221,7 +223,7 @@ export class Dependency<T extends object> {
             },
         );
     }
-    private setApi(api: any) {
+    private setApi(api: T) {
         //if(typeof api === "function")
         //    this._api = api();
         //else
@@ -334,6 +336,7 @@ const _self = {
     setup: Dependency.setup,
     waitFor: Dependency.waitFor,
     declare: Dependency.declare,
+    State,
 };
 export const SubSystem = _self;
 export default SubSystem;
