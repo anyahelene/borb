@@ -1,4 +1,3 @@
-
 export class BorbElement extends HTMLElement {
   static tag: string;
   constructor() {
@@ -48,12 +47,9 @@ export function assert<T>(
   return cond;
 }
 
-export function upgradeElements(
-  eltDef: typeof BorbElement,
-) {
+export function upgradeElements(eltDef: typeof BorbElement) {
   const previousTag = previousTagName(eltDef.tag);
-  if (!previousTag)
-    return;
+  if (!previousTag) return;
   for (const oldElt of document.getElementsByTagName(previousTag)) {
     const newElt = new eltDef();
     console.log('upgrading', oldElt, 'to', newElt);
@@ -67,7 +63,6 @@ export function upgradeElements(
   }
 }
 
-
 let unique = 0;
 
 /**
@@ -77,7 +72,10 @@ let unique = 0;
  */
 export function uniqueId(...strOrElts: (Element | string)[]): string {
   let prefix = '_';
-  if ((typeof strOrElts[0] === 'string') && (typeof strOrElts[1] in ['undefined', 'string'])) {
+  if (
+    typeof strOrElts[0] === 'string' &&
+    typeof strOrElts[1] in ['undefined', 'string']
+  ) {
     prefix = strOrElts.shift() as string;
   }
   let suffix = '_';
@@ -91,11 +89,21 @@ export function uniqueId(...strOrElts: (Element | string)[]): string {
   return `${prefix}${suffix}${unique++}`;
 }
 
-let keyhandler: (key: string, button?: HTMLElement, event?: Event) => Promise<any> = (key) => Promise.resolve();
-export function setKeyHandler(handler: (key: string, button?: HTMLElement, event?: Event) => Promise<any>) {
+let keyhandler: (
+  key: string,
+  button?: HTMLElement,
+  event?: Event,
+) => Promise<any> = (key) => Promise.resolve();
+export function setKeyHandler(
+  handler: (key: string, button?: HTMLElement, event?: Event) => Promise<any>,
+) {
   keyhandler = handler;
 }
 
-export function handleKey(key: string, button?: HTMLElement, event?: Event): Promise<any> {
+export function handleKey(
+  key: string,
+  button?: HTMLElement,
+  event?: Event,
+): Promise<any> {
   return keyhandler(key, button, event);
 }
