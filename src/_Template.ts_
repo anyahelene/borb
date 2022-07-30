@@ -1,0 +1,51 @@
+import SubSystem from '../SubSystem';
+import { Hole, html, render } from "uhtml";
+import { turtleduck } from '../TurtleDuck';
+import { BorbElement, tagName, assert } from './Borb';
+import { data } from './Styles';
+import IndexedMap from './IndexedMap';
+import { uniqueId } from 'lodash-es';
+import exports from 'webpack';
+//import 'css/frames.css';
+
+const subsys_name = 'SUBSYSTEM';
+const revision: number = import.meta.webpackHot && import.meta.webpackHot.data ? import.meta.webpackHot.data['revision'] + 1 : 0;
+const previousVersion: typeof self = import.meta.webpackHot && import.meta.webpackHot.data ? import.meta.webpackHot.data['self'] : undefined;
+
+
+class STATE {
+    constructor(old? : STATE) {
+
+    }
+}
+
+const stateHolder : STATE = new STATE(previousVersion.stateHolder);
+
+const self = { STATE, stateHolder};
+export const SUBSYSTEM = self;
+export default SUBSYSTEM;
+
+SubSystem.declare(`borb/${subsys_name.toLowerCase()}`, self)
+    .depends('dom')
+    .start((self, dep) => {
+        console.groupCollapsed("defining ${subsys_name}:");
+        try {
+
+        } finally {
+            console.groupEnd();
+        }
+    })
+    .register();
+
+
+if (import.meta.webpackHot) {
+    import.meta.webpackHot.accept();
+    // import.meta.webpackHot.accept(styleRef, () => {
+    //     turtleduck.styles.update(styleRef);
+    // });
+    import.meta.webpackHot.addDisposeHandler(data => {
+        console.warn(`Unloading ${subsys_name}`);
+        data['revision'] = revision;
+        data['self'] = self;
+    });
+}
