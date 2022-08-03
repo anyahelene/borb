@@ -1,5 +1,6 @@
 import SubSystem from './SubSystem';
-import { BorbBaseElement, sysId, tagName, uniqueId } from './Common';
+import { sysId, tagName, uniqueId } from './Common';
+import { BorbBaseElement } from './BaseElement';
 import { html, render } from 'uhtml';
 import { MDRender } from './MDRender';
 import Styles from './Styles';
@@ -21,8 +22,6 @@ export class BorbDocument extends BorbBaseElement {
     mdRender: { render_unsafe(elt: HTMLElement, text: string): void };
     srcText?: string;
     _observer = new MutationObserver((_muts) => this.update());
-    _docChanged = true;
-    _doUpdate = false;
     scrollElement: HTMLDivElement;
     constructor() {
         super(['css/common.css', styleRef]);
@@ -75,8 +74,7 @@ export class BorbDocument extends BorbBaseElement {
         }
         return this.mdRender;
     }
-    async update(): Promise<void> {
-        this._doUpdate = false;
+    async update(docChanged = false): Promise<void> {
         console.warn('Document update', this);
         const src = this.src;
         const docURL = new URL(document.URL);
@@ -186,14 +184,6 @@ export class BorbDocument extends BorbBaseElement {
             this.isConnected,
             this.shadowRoot,
         );
-    }
-
-    queueUpdate(docChanged = false) {
-        this._docChanged ||= docChanged;
-        if (!this._doUpdate) {
-            this._doUpdate = true;
-            queueMicrotask(() => this.update());
-        }
     }
 }
 

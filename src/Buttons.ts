@@ -1,12 +1,6 @@
 import SubSystem from './SubSystem';
-import {
-    BorbElement,
-    tagName,
-    handleKey,
-    sysId,
-    BorbBaseElement,
-} from './Common';
-
+import { tagName, handleKey, sysId } from './Common';
+import { BorbBaseElement, BorbElement } from './BaseElement';
 import { Hole, html, render } from 'uhtml';
 import { DragNDrop, BorbDragEvent } from './DragNDrop';
 import Styles from './Styles';

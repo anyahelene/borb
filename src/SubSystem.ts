@@ -1,4 +1,5 @@
-import { BorbElement, upgradeElements } from './Common';
+import type { BorbElement } from './BaseElement';
+import { upgradeElements } from './Common';
 
 // eslint-disable no-unused-vars
 enum State {
@@ -189,10 +190,10 @@ export class Dependency<T extends object> {
             sys = Dependency.queue.shift();
         }
     }
-    static async waitFor(sysName: string): Promise<Dependency<object>> {
+    static async waitFor<T extends object>(sysName: string): Promise<T> {
         const dep = Dependency.get(sysName);
         await dep.promise;
-        return Promise.resolve(dep);
+        return Promise.resolve(dep._api as T);
     }
     static register(sys: SubSystem<object>) {
         const depsys = Dependency.get(sys.name);

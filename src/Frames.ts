@@ -1,13 +1,7 @@
 import { SubSystem } from './SubSystem';
 import { html, render } from 'uhtml';
-import {
-    BorbElement,
-    tagName,
-    assert,
-    uniqueId,
-    sysId,
-    BorbBaseElement,
-} from './Common';
+import { tagName, assert, uniqueId, sysId } from './Common';
+import { BorbBaseElement, BorbElement } from './BaseElement';
 import { isEqual } from 'lodash-es';
 import { DragNDrop, BorbDragEvent } from './DragNDrop';
 import Styles from './Styles';
@@ -187,8 +181,6 @@ export class BorbFrame extends BorbBaseElement {
     private _tabs: Map<Element, TabEntry> = new Map();
     private _nav: HTMLElement;
     private _observer: MutationObserver;
-    private _childListChanged = true;
-    private _doUpdate = false;
     // private _style: HTMLStyleElement;
     // private _styleChangedHandler = (ev: Event) => this.styleChanged();
     private _header: HTMLElement;
@@ -256,7 +248,7 @@ export class BorbFrame extends BorbBaseElement {
                 }
                 if (ev.dropped) {
                     ev.dragSource.frame.queueUpdate(true);
-                    ev.dragSource.frame._childListChanged = true;
+                    ev.dragSource.frame._structureChanged = true;
                     ev.dragSource.select();
                     if (this != ev.dragSource.frame)
                         this._tabs.set(ev.dragSource.element, ev.dragSource);
@@ -268,13 +260,6 @@ export class BorbFrame extends BorbBaseElement {
         });
     }
 
-    queueUpdate(childListChanged = false) {
-        this._childListChanged ||= childListChanged;
-        if (!this._doUpdate) {
-            this._doUpdate = true;
-            queueMicrotask(() => this.update());
-        }
-    }
     get frameTitle(): string {
         const title = this.hasAttribute('frame-title')
             ? this.getAttribute('frame-title')
@@ -291,10 +276,9 @@ export class BorbFrame extends BorbBaseElement {
     prevTab() {
         this.id;
     }
-    update() {
+    update(childListChanged = false): void {
         if (!this.isConnected) return;
-        this._doUpdate = false;
-        if (this._childListChanged) this.updateChildren();
+        if (childListChanged) this.updateChildren();
 
         this._tabs.forEach((tab) =>
             tab.setAttribute('aria-selected', String(tab === this.selected)),
@@ -367,7 +351,7 @@ export class BorbFrame extends BorbBaseElement {
     }
 
     updateChildren() {
-        this._childListChanged = false;
+        this._structureChanged = false;
         let selected: TabEntry = undefined;
         const removedChildren = new Set(this._tabs.keys());
         const before = [...this._nav.children];

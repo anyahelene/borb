@@ -1,31 +1,5 @@
-import Styles from './Styles';
+import type { BorbElement } from './BaseElement';
 
-export class BorbElement extends HTMLElement {
-    static tag: string;
-    constructor() {
-        super();
-    }
-}
-export class BorbBaseElement extends BorbElement {
-    static tag: string;
-    styles: HTMLStyleElement[];
-    constructor(protected stylesUrls: string[] = []) {
-        super();
-    }
-
-    connectedCallback() {
-        if (this.isConnected) {
-            this.styles = this.stylesUrls.map((styleRef) =>
-                Styles.getStyleFor(this, styleRef),
-            );
-        }
-    }
-    disconnectedCallback() {
-        this.styles = this.stylesUrls.map((styleRef) =>
-            Styles.disposeStyle(this, styleRef),
-        );
-    }
-}
 export const borbName = 'borb';
 
 export const borbPrefix = `${borbName}-`;
@@ -72,23 +46,6 @@ export function assert<T>(
         }
     }
     return cond;
-}
-
-export function upgradeElements(eltDef: typeof BorbElement) {
-    const previousTag = previousTagName(eltDef.tag);
-    if (!previousTag) return;
-    console.log('UPGRADING', document.getElementsByTagName(previousTag));
-    for (const oldElt of [...document.getElementsByTagName(previousTag)]) {
-        const newElt = new eltDef();
-        console.log('upgrading', oldElt, 'to', newElt);
-        oldElt.getAttributeNames().forEach((attrName) => {
-            console.log('set', attrName, oldElt.getAttribute(attrName));
-            newElt.setAttribute(attrName, oldElt.getAttribute(attrName));
-        });
-        newElt.replaceChildren(...oldElt.childNodes);
-        console.log('replacedChildren:', newElt.children);
-        oldElt.parentElement.replaceChild(newElt, oldElt);
-    }
 }
 
 let unique = 0;
@@ -138,4 +95,21 @@ export function handleKey(
     event?: Event,
 ): Promise<unknown> {
     return keyhandler(key, button, event);
+}
+
+export function upgradeElements(eltDef: typeof BorbElement) {
+    const previousTag = previousTagName(eltDef.tag);
+    if (!previousTag) return;
+    console.log('UPGRADING', document.getElementsByTagName(previousTag));
+    for (const oldElt of [...document.getElementsByTagName(previousTag)]) {
+        const newElt = new eltDef();
+        console.log('upgrading', oldElt, 'to', newElt);
+        oldElt.getAttributeNames().forEach((attrName) => {
+            console.log('set', attrName, oldElt.getAttribute(attrName));
+            newElt.setAttribute(attrName, oldElt.getAttribute(attrName));
+        });
+        newElt.replaceChildren(...oldElt.childNodes);
+        console.log('replacedChildren:', newElt.children);
+        oldElt.parentElement.replaceChild(newElt, oldElt);
+    }
 }
