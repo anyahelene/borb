@@ -1,5 +1,5 @@
 import type { BorbElement } from './BaseElement';
-import { upgradeElements } from './Common';
+import { interpolate, upgradeElements } from './Common';
 
 // eslint-disable no-unused-vars
 enum State {
@@ -337,6 +337,9 @@ const _self = {
     setup: Dependency.setup,
     waitFor: Dependency.waitFor,
     declare: Dependency.declare,
+    util: {
+        interpolate,
+    },
     State,
 };
 export const SubSystem = _self;

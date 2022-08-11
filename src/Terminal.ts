@@ -5,6 +5,7 @@ import { html, render } from 'uhtml';
 import Styles from './Styles';
 import { HistorySession, History, history } from './History';
 import { Settings } from './Settings';
+import LineEditors, { LineEditor } from './LineEditor';
 
 const revision: number =
     import.meta.webpackHot && import.meta.webpackHot.data
@@ -16,29 +17,11 @@ const previousVersion: typeof _self =
         : undefined;
 const styleRef = 'css/terminal.css';
 
-interface Shell {
-    eval(line: string, outputElement?: HTMLElement): Promise<number>;
-    printer: Printer;
-}
-interface Printer {
-    print(...args: string[]): string;
-    println(...args: string[]): string;
-}
-
-interface EditorService {
-    createLineEditor(
-        elt: HTMLElement,
-        text: string,
-        lang: string,
-        handler: (key: string, state: unknown) => boolean,
-        root: Document | ShadowRoot,
-    ): LineEditor;
-}
-interface LineEditor {
-    focus(): void;
-    attach(elt: HTMLElement): void;
-    dispose(): void;
-}
+export type DisplayData = {
+    data?: BlobPart | BlobPart[];
+    url?: URL | string;
+    type: string;
+};
 function writeLine(elt: HTMLElement, line: string): Element {
     let lineElt = elt.lastElementChild;
     if (!lineElt || !lineElt.classList.contains('borb-line-open')) {
@@ -51,32 +34,35 @@ function writeLine(elt: HTMLElement, line: string): Element {
 function newLine(elt: HTMLElement) {
     const lineElt = elt.lastElementChild;
     if (lineElt) lineElt.classList.remove('borb-line-open');
+    return lineElt;
 }
-class BorbTerminal extends BorbBaseElement implements Printer {
+export class BorbTerminal extends BorbBaseElement implements Printer {
     static tag = tagName('terminal', revision);
-    public editor: LineEditor;
-    public history: HistorySession;
+
     private _observer: MutationObserver = new MutationObserver((muts) =>
         this.queueUpdate(true),
     );
     private _keydownListener = (ev: KeyboardEvent) => {
+        console.log(ev);
         if (ev.ctrlKey && ev.key === 'c') {
             return;
         } else if (ev.key === 'Control') {
             return;
         } else {
-            this.editor.focus();
+            this._lineEditor.focus();
         }
     };
     private _outElt: HTMLElement;
     private _inElt: HTMLElement;
-    private _cr = false;
     private _lineEditor: LineEditor;
-    private _shell: Shell;
+    private _outAnchor: HTMLDivElement;
     constructor() {
         super(['css/common.css', styleRef]);
-        this._outElt = html.node`<div class="terminal-out"></div>`;
-        this._inElt = html.node`<div class="terminal-in"></div>`;
+        this._outElt = document.createElement('div');
+        this._outElt.classList.add('terminal-out');
+        this._inElt = document.createElement('div');
+        this._inElt.classList.add('terminal-in');
+        this._outAnchor = document.createElement('div');
     }
 
     print(...args: string[]): string {
@@ -89,34 +75,49 @@ class BorbTerminal extends BorbBaseElement implements Printer {
             }
             lastLine = writeLine(this._outElt, line);
         });
-        lastLine.scrollIntoView();
+        this.scrollToBottom();
         return s;
     }
     println(...args: string[]): string {
         return this.print(...args, '\n');
     }
-    handleKey(key: string, state: unknown): boolean {
-        console.log('Terminal input:', key);
-        if (key === 'enter') {
-            if (this._shell && this.history) {
-                const line = (state as any).doc.toString();
-                this.classList.add('running');
-                this.enter(line).finally(() =>
-                    this.classList.remove('running'),
-                );
-                return true;
-            }
-        }
-        return false;
-    }
-    async enter(line: string): Promise<number> {
-        const id = await this.history.edit(line);
-        await this.history.enter();
-        this.println(`[${id}] ${line}`);
-        const ret = await this._shell.eval(line);
-        return ret;
-    }
 
+    printElement(elt: HTMLElement): void {
+        this.endline();
+        this._outElt.appendChild(elt);
+        this.scrollToBottom();
+    }
+    endline() {
+        const lastLine = newLine(this._outElt);
+        this.scrollToBottom();
+    }
+    display(obj: DisplayData) {
+        if (!obj.type.startsWith('image/')) {
+            console.warn(
+                "%o.display(%o): don't know how to display %s",
+                this,
+                obj,
+                obj.type,
+            );
+            return;
+        }
+        let url = obj.url instanceof URL ? obj.url.toString() : obj.url;
+        let revoke: () => void;
+        if (obj.data) {
+            const data = obj.data instanceof Array ? obj.data : [obj.data];
+            const blob = new Blob(data, { type: obj.type });
+            url = URL.createObjectURL(blob);
+            revoke = () => URL.revokeObjectURL(url);
+        }
+        if (url) {
+            const img = document.createElement('img');
+            img.src = url;
+            if (revoke) img.addEventListener('load', revoke, { once: true });
+            this._outElt.appendChild(img);
+        } else {
+            console.warn('%o.display(%o): missing url or data:', this, obj);
+        }
+    }
     connectedCallback() {
         super.connectedCallback();
         if (this.isConnected) {
@@ -136,39 +137,25 @@ class BorbTerminal extends BorbBaseElement implements Printer {
                 historyId,
             );
             if (!this._lineEditor) {
-                this._lineEditor = SubSystem.getApi<EditorService>(
-                    'editor',
-                ).createLineEditor(
-                    this._inElt,
-                    '',
-                    shellName || 'plain',
-                    (key, state) => this.handleKey(key, state),
-                    this.shadowRoot,
-                );
+                const LE = SubSystem.getApi<typeof LineEditors>(
+                    LineEditors._id,
+                ).LineEditor;
+                this._lineEditor = new LE(this, this._inElt, this._outElt);
             }
-            if (!this._shell) {
-                SubSystem.waitFor<Shell>(shellName).then((sh) => {
-                    this._shell = sh;
-                    this._shell.printer = this;
-                    this.queueUpdate();
-                });
-            }
-            if (!this.history) {
-                SubSystem.getApi<History>(history._id)
-                    .forSession(historyId)
-                    .then((hist) => (this.history = hist));
-            }
+
             console.log('element added to page.', this);
             this._observer.observe(this, {
                 childList: true,
                 attributeFilter: ['frame-title'],
             });
+            this.addEventListener('keydown', this._keydownListener);
             this.queueUpdate();
             // DragNDrop.attachDropZone(this._header, '[role="tab"], header');
         }
     }
     disconnectedCallback() {
         super.disconnectedCallback();
+        this.removeEventListener('keydown', this._keydownListener);
         this._observer.disconnect();
         // DragNDrop.detachDropZone(this._header);
         console.log('removed from page.', this);
@@ -178,9 +165,21 @@ class BorbTerminal extends BorbBaseElement implements Printer {
         render(
             this.shadowRoot,
             html`${this.styles}
-                <div class="terminal-out-container">${this._outElt}</div>
-                <div class="terminal-in-container">${this._inElt}</div>`,
+                <div class="terminal-out-container" tabindex="-1">
+                    ${this._outAnchor} ${this._outElt}
+                </div>
+                ${this._inElt}`,
         );
+    }
+
+    scrollToBottom() {
+        this._outAnchor.scrollIntoView();
+    }
+    get status(): string {
+        return this.getAttribute('status');
+    }
+    set status(s: string) {
+        this.setAttribute('status', s);
     }
 }
 
@@ -194,7 +193,7 @@ export default Terminals;
 
 SubSystem.declare(_self)
     .reloadable(true)
-    .depends('dom', Styles, Settings, history, 'editor')
+    .depends('dom', Styles, Settings, history, LineEditors)
     .elements(BorbTerminal)
     .register();
 

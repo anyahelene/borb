@@ -113,3 +113,26 @@ export function upgradeElements(eltDef: typeof BorbElement) {
         oldElt.parentElement.replaceChild(newElt, oldElt);
     }
 }
+
+export function interpolate(s: string, data: { [attr: string]: string }) {
+    const props = new Set<string>(Object.keys(data));
+    let result = '';
+    for (;;) {
+        const m = s.match(
+            /^(.*?)\${(?:{(.*?)})?([a-z0-9-]*)(?:{(.*?)})?}(.*)$/,
+        );
+
+        if (m) {
+            result = result + m[1];
+            s = m[5];
+            const prefix = m[2] ?? '';
+            const attr = m[3];
+            const suffix = m[4] ?? '';
+            if (props.has(attr) && data[attr]) {
+                result = result + prefix + data[attr] + suffix;
+            }
+        } else {
+            return result + s;
+        }
+    }
+}

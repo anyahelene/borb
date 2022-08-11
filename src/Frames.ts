@@ -1,6 +1,6 @@
 import { SubSystem } from './SubSystem';
 import { html, render } from 'uhtml';
-import { tagName, assert, uniqueId, sysId } from './Common';
+import { tagName, assert, uniqueId, sysId, interpolate } from './Common';
 import { BorbBaseElement, BorbElement } from './BaseElement';
 import { isEqual } from 'lodash-es';
 import { DragNDrop, BorbDragEvent } from './DragNDrop';
@@ -60,18 +60,35 @@ dragImage.style.background = 'none';
 
 //const dragImage = (html.node`<img width="0" height="0" style="background:green!important;opacity:0%" id="transparent-pixel" src="">`;
 
-class TabEntry extends HTMLButtonElement {
-    static nameAttrs = [
+const nameAttrs = new Map<string, string[]>([
+    [
         'tab-title',
-        'frame-title',
-        'data-tab-title',
-        'data-title',
-        'data-frame-title',
-    ];
+        [
+            'tab-title',
+            'data-tab-title',
+            'frame-title',
+            'data-title',
+            'data-frame-title',
+        ],
+    ],
+    ['title-left', ['title-left']],
+    ['title-right', ['title-right', 'status']],
+    ['title-mid', ['title-mid']],
+    ['icon', ['icon', 'data-icon']],
+]);
+class TabEntry extends HTMLButtonElement {
+    nameAttrList = [...nameAttrs.values()].flat();
     static tag = tagName('tab-button-internal', revision);
     element: HTMLElement;
     observer: MutationObserver;
     frame: BorbFrame;
+    titleAttrs: { [attr: string]: string };
+    titleElts = {
+        left: html.node`<span class="title-left></span>"`,
+        mid: html.node`<span class="title-mid"></span>`,
+        right: html.node`<span class="title-right"></span>`,
+    };
+    tabName: string;
     constructor() {
         super();
     }
@@ -85,9 +102,12 @@ class TabEntry extends HTMLButtonElement {
         this.setAttribute('aria-controls', this.panel.id ?? '');
         this.dataset.drop = 'true';
         this.type = 'button';
-        this.observer = new MutationObserver(() => this.update());
+        this.observer = new MutationObserver(() => {
+            this._getTitleAttrs();
+            this.update();
+        });
         this.observer.observe(this.element, {
-            attributeFilter: TabEntry.nameAttrs,
+            attributeFilter: this.nameAttrList,
         });
         this.element.slot = this.frame.classList.contains('no-tabs')
             ? ''
@@ -97,6 +117,7 @@ class TabEntry extends HTMLButtonElement {
         }
         this.addEventListener('click', this.select); // safe since 'click' is dispatched on 'this'
         DragNDrop.attachDraggable(this);
+        this._getTitleAttrs();
         this.update();
         return this;
     }
@@ -134,15 +155,23 @@ class TabEntry extends HTMLButtonElement {
         }
     }
     get hidden(): boolean {
-        return this.element.hidden || !this.tabTitle;
+        return this.element.hidden || !this.titleAttrs['tab-title'];
     }
 
-    get tabTitle(): string {
-        for (const name of TabEntry.nameAttrs) {
-            if (this.element.hasAttribute(name))
-                return this.element.getAttribute(name);
-        }
-        return '';
+    _getTitleAttrs(): void {
+        this.titleAttrs = {};
+        nameAttrs.forEach((attrs, key) => {
+            for (const attr of attrs) {
+                if (this.element.hasAttribute(attr)) {
+                    this.titleAttrs[key] = this.element.getAttribute(attr);
+                    break;
+                }
+            }
+        });
+        this.tabName = this.titleAttrs['tab-title'] ?? this.id;
+        this.titleElts.left.innerText = this.titleAttrs['title-left'] ?? '';
+        this.titleElts.mid.innerText = this.titleAttrs['title-mid'] ?? '';
+        this.titleElts.right.innerText = this.titleAttrs['title-right'] ?? '';
     }
 
     select() {
@@ -158,7 +187,12 @@ class TabEntry extends HTMLButtonElement {
         return this.element.slot;
     }
     update() {
-        render(this, html`<span>${this.tabTitle}</span>`);
+        render(
+            this,
+            html`${this.titleAttrs['icon']
+                    ? html`<span class="icon">${this.titleAttrs['icon']}</span>`
+                    : ''}<span>${this.titleAttrs['tab-title']}</span>`,
+        );
     }
 
     isLeftOf(other: HTMLElement): boolean {
@@ -263,15 +297,18 @@ export class BorbFrame extends BorbBaseElement {
     get frameTitle(): string {
         const title = this.hasAttribute('frame-title')
             ? this.getAttribute('frame-title')
-            : '<tab-title>';
-        const tabTitle = this.selected ? this.selected.tabTitle : '';
-        return title.replace('<tab-title>', tabTitle);
+            : '${tab-title}';
+        const tabAttrs = this.selected ? this.selected.titleAttrs : {};
+        return interpolate(title, tabAttrs);
     }
     get frameName(): string {
-        const title = this.hasAttribute('frame-title')
-            ? this.getAttribute('frame-title')
-            : '<tab-title>';
-        return title.replace('<tab-title>', '').replace(/^\s*(:\s*)?/, '');
+        const title = interpolate(
+            this.hasAttribute('frame-title')
+                ? this.getAttribute('frame-title')
+                : this.id,
+            {},
+        );
+        return `${title}${this.selected ? ':' + this.selected.tabName : ''}`;
     }
     prevTab() {
         this.id;
@@ -285,7 +322,16 @@ export class BorbFrame extends BorbBaseElement {
         );
         //console.log("render", this, this, this.isConnected, this.shadowRoot, frameTitle, dh, minIcon, maxIcon);
         try {
-            this._header.querySelector('h1').innerText = this.frameTitle ?? '';
+            const title =
+                this.selected?.titleAttrs['title-left'] ??
+                this.frameTitle ??
+                '';
+            render(
+                this._header.querySelector('h1'),
+                html`<span class="title-left">${title}</span>${this.selected
+                        ?.titleElts.mid ?? ''}${this.selected?.titleElts
+                        .right ?? ''}`,
+            );
             render(
                 this.shadowRoot,
                 html`${this.styles}${this._header}

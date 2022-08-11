@@ -26,13 +26,13 @@ interface Session {
     date: Date;
     shells: [string, number][];
 }
-interface Entry {
-    session: string;
-    shell: string;
+export interface Entry {
+    session?: string;
+    shell?: string;
     id: number;
     data: string;
+    origData?: string;
 }
-
 class HistoryDexie extends Dexie {
     sessions: Dexie.Table<Session, [string, string]>;
     entries: Dexie.Table<Entry, [string, string]>;
@@ -106,22 +106,23 @@ export interface HistorySession {
         query: string,
         dir?: SearchDirection,
         skip?: boolean,
-    ): Promise<string | undefined>;
+    ): Promise<Entry | undefined>;
     init(): Promise<void>;
-    get(id?: number): Promise<string>;
+    get(id?: number): Promise<Entry>;
     edit(line: string): Promise<number>;
-    enter(): Promise<number>;
-    first(): Promise<string>;
-    last(): Promise<string>;
-    prev(): Promise<string>;
-    next(): Promise<string>;
+    enter(line?: string): Promise<number>;
+    first(): Promise<Entry>;
+    last(): Promise<Entry>;
+    prev(): Promise<Entry>;
+    next(): Promise<Entry>;
+    list(): Promise<Entry[]>;
 }
 
 export interface History {
     _id: string;
     _revision: number;
     forSession(session: string): Promise<HistorySession>;
-    get(session: string, id?: number): Promise<string>;
+    get(session: string, id?: number): Promise<Entry>;
     put(session: string, data: string, id?: number): Promise<number>;
     list(session: string): Promise<Entry[]>;
     sessions(sortBy: string): Promise<Session[]>;
@@ -130,23 +131,25 @@ export interface History {
 
 let db: HistoryDexie;
 class DBHistorySession implements HistorySession {
-    private id: number;
+    private entry: Entry;
+    private newEntry: Entry;
+    private lastEntry: Entry;
     key: [string, string, number?];
-    edits: string[] = [];
+    edits: Entry[] = [];
     session: string;
-    line?: string;
     qKey: { session: string; shell: string };
     constructor(session: string) {
         this.key = make_key(session);
         this.session = session;
         this.qKey = { session: this.key[0], shell: this.key[1] };
+        this.initEntry(0);
     }
     async search(
         query: string,
         dir: SearchDirection = SearchDirection.BACKWARDS,
         skip = false,
-    ): Promise<string | undefined> {
-        const id = skip ? this.id + dir : this.id;
+    ): Promise<Entry | undefined> {
+        const id = skip ? this.entry.id + dir : this.entry.id;
         const entry =
             dir === SearchDirection.BACKWARDS //
                 ? await db.entries
@@ -159,62 +162,75 @@ class DBHistorySession implements HistorySession {
                       .and((e) => e.id > id && e.data.indexOf(query) > 0)
                       .first();
         if (entry) {
-            this.go(entry);
-            return this.line;
+            return this.go(entry);
         } else {
             return undefined;
         }
     }
-    async init(): Promise<void> {
-        this.id = await DBHistory.currentId(this.session);
+
+    private initEntry(id: number, data = '') {
+        this.newEntry = { id, data, origData: '', ...this.qKey };
+        this.entry = this.newEntry;
     }
-    async get(id?: number): Promise<string> {
-        return DBHistory.get(this.session, id ? id : this.id);
+    async init(): Promise<void> {
+        const id = await DBHistory.currentId(this.session);
+        this.initEntry(id);
+    }
+    async get(id?: number): Promise<Entry> {
+        if (id === undefined) return this.entry;
+        return this.edits[id] ?? (await DBHistory.get(this.session, id));
     }
     async edit(line: string): Promise<number> {
-        this.edits[this.id] = this.line = line;
-        return this.id;
+        if (line !== this.entry.data) {
+            this.entry.data = line;
+            this.edits[this.entry.id] = this.entry;
+        }
+        return this.entry.id;
     }
-    async enter(): Promise<number> {
+    async enter(line?: string): Promise<number> {
+        if (line !== undefined) this.edit(line);
         this.edits = [];
-        return DBHistory.put(this.session, this.line).then((id) => {
-            this.id = id;
+        return DBHistory.put(this.session, this.entry.data).then((id) => {
+            this.initEntry(id + 1);
             return Promise.resolve(id);
         });
     }
     private go(entry: Entry) {
         if (entry) {
-            this.id = entry.id;
-            if (this.edits[this.id] === undefined) this.line = entry.data;
-            else this.line = this.edits[this.id];
+            const edited = this.edits[entry.id];
+            entry = this.entry = edited ?? { ...entry, origData: entry.data };
+        }
+        return entry;
+    }
+    async first(): Promise<Entry> {
+        return this.go(await db.entries.where(this.qKey).first());
+    }
+    async last(): Promise<Entry> {
+        const last = await db.entries.where(this.qKey).last();
+        if (last && last.id > this.newEntry.id) {
+            return this.go(last);
+        } else {
+            return this.go(this.newEntry);
         }
     }
-    async first(): Promise<string> {
-        this.go(await db.entries.where(this.qKey).first());
-        return this.line;
-    }
-    async last(): Promise<string> {
-        this.go(await db.entries.where(this.qKey).last());
-        return this.line;
-    }
-    async prev(): Promise<string> {
-        this.go(
+    async prev(): Promise<Entry> {
+        return this.go(
             await db.entries
                 .where(this.qKey)
-                .and((e) => e.id < this.id)
+                .and((e) => e.id < this.entry.id)
                 .reverse()
                 .first(),
         );
-        return this.line;
     }
-    async next(): Promise<string> {
-        this.go(
-            await db.entries
-                .where(this.qKey)
-                .and((e) => e.id > this.id)
-                .first(),
-        );
-        return this.line;
+    async next(): Promise<Entry> {
+        const next = await db.entries
+            .where(this.qKey)
+            .and((e) => e.id > this.entry.id)
+            .first();
+        return this.go(next ?? this.newEntry);
+    }
+    async list(): Promise<Entry[]> {
+        return await history.list(this.session);
     }
 }
 const DBHistory: History = {
@@ -225,19 +241,16 @@ const DBHistory: History = {
         await hist.init();
         return hist;
     },
-    async get(session: string, id?: number): Promise<string> {
+    async get(session: string, id?: number): Promise<Entry> {
         console.log('get', session, id, db, make_key(session, id));
 
         if (typeof id != 'number') {
             id = await this.currentId(session);
         }
-        return await db.entries
-            .get(make_key(session, id))
-            .then((entry) => Promise.resolve(entry.data))
-            .catch((e) => {
-                console.error(e);
-                return Promise.resolve('');
-            });
+        return await db.entries.get(make_key(session, id)).catch((e) => {
+            console.error(e);
+            return Promise.resolve({ id, data: undefined });
+        });
     },
 
     put(session: string, data: string, id?: number): Promise<number> {
@@ -297,7 +310,7 @@ const DBHistory: History = {
     async currentId(session: string): Promise<number> {
         const data = await db.sessions.get(make_key(session));
         if (data) {
-            return data.id;
+            return data.id + 1;
         } else {
             return 0;
         }
@@ -315,10 +328,10 @@ class FakeHistorySession implements HistorySession {
         query: string,
         dir?: SearchDirection,
         skip?: boolean,
-    ): Promise<string> {
+    ): Promise<Entry> {
         throw new Error('Method not implemented.');
     }
-    async get(id?: number): Promise<string> {
+    async get(id?: number): Promise<Entry> {
         return FakeHistory.get(this.session, id ? id : this.id);
     }
     async edit(line: string): Promise<number> {
@@ -332,27 +345,30 @@ class FakeHistorySession implements HistorySession {
             return Promise.resolve(id);
         });
     }
-    async first(): Promise<string> {
+    async first(): Promise<Entry> {
         throw new Error('Method not implemented.');
     }
-    async last(): Promise<string> {
+    async last(): Promise<Entry> {
         throw new Error('Method not implemented.');
     }
-    async prev(): Promise<string> {
+    async prev(): Promise<Entry> {
         throw new Error('Method not implemented.');
     }
-    async next(): Promise<string> {
+    async next(): Promise<Entry> {
         throw new Error('Method not implemented.');
     }
 
     async init(): Promise<void> {
         this.id = await FakeHistory.currentId(this.session);
     }
+    async list(): Promise<Entry[]> {
+        return [];
+    }
 }
 
 const fakeHistorySessions = {};
 const fakeHistoryEntries: { [sessionName: string]: Entry[] } = {};
-const FakeHistory = {
+const FakeHistory: History = {
     _id: id,
     _revision: revision,
     async forSession(session: string): Promise<HistorySession> {
@@ -360,13 +376,21 @@ const FakeHistory = {
         await hist.init();
         return hist;
     },
-    async get(session: string, id?: number): Promise<string> {
+    async get(session: string, id?: number): Promise<Entry> {
         console.log('get', session, id, make_key(session, id));
+        const key = make_key(session, id);
         if (!fakeHistoryEntries[session]) fakeHistoryEntries[session] = [];
         if (typeof id != 'number') {
             id = await this.currentId(session);
         }
-        return fakeHistoryEntries[session][id].data || '';
+        return (
+            fakeHistoryEntries[session][id] || {
+                id,
+                data: '',
+                session: key[0],
+                shell: key[1],
+            }
+        );
     },
 
     put(session: string, data: string, id?: number): Promise<number> {
@@ -385,10 +409,10 @@ const FakeHistory = {
         return Promise.resolve(thisId);
     },
 
-    list(session: string): Promise<any[]> {
+    list(session: string): Promise<Entry[]> {
         if (!fakeHistoryEntries[session]) fakeHistoryEntries[session] = [];
-
-        return Promise.resolve(new Array(fakeHistoryEntries[session]));
+        const entries = fakeHistoryEntries[session];
+        return Promise.resolve(entries.slice());
     },
     async sessions(sortBy = 'date'): Promise<Session[]> {
         return Promise.resolve([]);
@@ -409,7 +433,7 @@ const _self_proto = {
             h.forSession(session),
         );
     },
-    get(session: string, id?: number): Promise<string> {
+    get(session: string, id?: number): Promise<Entry> {
         return SubSystem.waitFor<History>(_self_proto._id).then((h) =>
             h.get(session, id),
         );

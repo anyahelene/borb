@@ -20,7 +20,20 @@ const configs: ConfigDict[] = previousVersion
     ? previousVersion.configs
     : [{}, {}, {}, {}, {}];
 export const configNames = ['override', 'session', 'user', 'remote', 'default'];
-
+/**  Convert a settings value to a lowercase string. Any leading or trailing spaces will be stripped. Returns undefined for undefined or null. */
+export function toLowerCase(value: unknown): string | undefined {
+    if (value === undefined || value === null) return undefined;
+    return `${value}`.toLowerCase().trim();
+}
+/** Convert a settings value to boolean. Interprets 'no', 'false', 'disabled' and 'off' as false, everything else based on the truthiness of the value */
+export function toBoolean(value: unknown) {
+    if (typeof value === 'boolean') return value;
+    else if (typeof value === 'string') {
+        const s = value.toLowerCase().trim();
+        if (['no', 'false', 'disabled', 'off'].indexOf(s) >= 0) return false;
+    }
+    return !!value;
+}
 export function getConfig<T extends string | Config>(
     path: string,
     defaultResult: T,
@@ -226,6 +239,8 @@ const _self = {
     sessionStorage,
     autoSaveConfig,
     configs,
+    toBoolean,
+    toLowerCase,
 };
 export const Settings = _self;
 export default Settings;
