@@ -242,15 +242,15 @@ const _self = {
     toBoolean,
     toLowerCase,
 };
-export const Settings = _self;
-export default Settings;
 
-SubSystem.declare(_self)
-    .reloadable(true)
-    .depends()
-    .elements(BorbSettings)
-    .start(() => loadConfig())
-    .register();
+export const Settings = SubSystem.declare(_self)
+.reloadable(true)
+.depends()
+.elements(BorbSettings)
+.start(() => loadConfig())
+.register();
+
+export default Settings;
 
 if (import.meta.webpackHot) {
     import.meta.webpackHot.accept();

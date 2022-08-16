@@ -503,7 +503,64 @@ export class BorbFrame extends BorbBaseElement {
     }
 }
 
-export const Frames = {
+export class BorbPanelBuilder<T extends HTMLElement = HTMLElement> {
+    private _frame: BorbFrame;
+    private _panel: T;
+    private _title: string;
+    private _id: string;
+    private _strict: boolean;
+    private _error: string[] = [];
+    frame(targetFrame: BorbFrame | string): this {
+        let fr =
+            typeof targetFrame === 'string'
+                ? document.getElementById(targetFrame)
+                : targetFrame;
+        if (!(fr instanceof BorbFrame)) {
+            const err = `Can't find frame, or not a BorbFrame: ${targetFrame}`;
+            this._error.push(err);
+            console.error(err, this, fr);
+        } else {
+            this._frame = fr;
+        }
+        return this;
+    }
+
+    panel<U extends HTMLElement = T>(panel: string): BorbPanelBuilder<U>;
+    panel<U extends HTMLElement>(panel: U): BorbPanelBuilder<U>;
+    panel<U extends HTMLElement>(
+        panel: U | string,
+    ): BorbPanelBuilder<U> | this {
+        if (typeof panel === 'string') {
+            this._panel = document.createElement(panel) as T;
+            return this;
+        } else {
+            const builder = this as unknown as BorbPanelBuilder<U>;
+            builder._panel = panel;
+            return builder;
+        }
+    }
+
+    get strict(): this {
+        this._strict = true;
+        return this;
+    }
+    done(): T {
+        if (!this._frame) this._error.push(`no frame specified`);
+
+        if (!this._title) this._error.push(`no title specified`);
+        if (this._strict && this._error !== [])
+            throw new Error(this._error.join('; '));
+
+        if (!this._panel) this._panel = document.createElement('section') as T;
+        if (this._title) this._panel.setAttribute('tab-title', this._title);
+        if (this._id) this._panel.id = this._id;
+        if (this._frame) this._frame.appendChild(this._panel);
+
+        return this._panel;
+    }
+}
+
+const _self = {
     _id: sysId(import.meta.url),
     _revision: revision,
     BorbFrame,
@@ -513,16 +570,16 @@ export const Frames = {
     version: 9,
     revision,
 };
-export default Frames;
-SubSystem.declare(Frames)
+export const Frames = SubSystem.declare(_self)
     .reloadable(true)
     .depends('dom', Styles)
     .elements(BorbFrame, BorbTab, BorbPanel)
     .start((self, dep) => {
         customElements.define(TabEntry.tag, TabEntry, { extends: 'button' });
-        return Frames;
+        return _self;
     })
     .register();
+export default Frames;
 
 if (import.meta.webpackHot) {
     import.meta.webpackHot.accept();

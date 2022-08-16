@@ -6,6 +6,7 @@ import Styles from './Styles';
 import { HistorySession, History, history } from './History';
 import { Settings } from './Settings';
 import LineEditors, { LineEditor } from './LineEditor';
+import { BorbFrame } from './Frames';
 
 const revision: number =
     import.meta.webpackHot && import.meta.webpackHot.data
@@ -48,7 +49,7 @@ export class BorbTerminal extends BorbBaseElement implements Printer {
             return;
         } else if (ev.key === 'Control') {
             return;
-        } else {
+        } else if (this._lineEditor) {
             this._lineEditor.focus();
         }
     };
@@ -56,6 +57,9 @@ export class BorbTerminal extends BorbBaseElement implements Printer {
     private _inElt: HTMLElement;
     private _lineEditor: LineEditor;
     private _outAnchor: HTMLDivElement;
+    private _whenReady: (value: BorbTerminal) => void;
+    /** A promise that will be fulfilled when the terminal is display on page */
+    whenReady: Promise<BorbTerminal>;
     constructor() {
         super(['css/common.css', styleRef]);
         this._outElt = document.createElement('div');
@@ -63,8 +67,20 @@ export class BorbTerminal extends BorbBaseElement implements Printer {
         this._inElt = document.createElement('div');
         this._inElt.classList.add('terminal-in');
         this._outAnchor = document.createElement('div');
+        this.whenReady = new Promise((resolve) => {
+            this._whenReady = resolve;
+        });
     }
 
+    public get lineEditor(): LineEditor {
+        return this._lineEditor;
+    }
+    public set lineEditor(value: LineEditor) {
+        this._lineEditor = value;
+    }
+    get inputElement(): HTMLElement {
+        return this._inElt;
+    }
     print(...args: string[]): string {
         const s = args.join(' ');
         const lines = s.split(/\r?\n/);
@@ -86,6 +102,7 @@ export class BorbTerminal extends BorbBaseElement implements Printer {
         this.endline();
         this._outElt.appendChild(elt);
         this.scrollToBottom();
+        console.log('printElement', elt);
     }
     endline() {
         const lastLine = newLine(this._outElt);
@@ -136,12 +153,6 @@ export class BorbTerminal extends BorbBaseElement implements Printer {
                 session,
                 historyId,
             );
-            if (!this._lineEditor) {
-                const LE = SubSystem.getApi<typeof LineEditors>(
-                    LineEditors._id,
-                ).LineEditor;
-                this._lineEditor = new LE(this, this._inElt, this._outElt);
-            }
 
             console.log('element added to page.', this);
             this._observer.observe(this, {
@@ -162,16 +173,32 @@ export class BorbTerminal extends BorbBaseElement implements Printer {
     }
 
     update() {
-        render(
-            this.shadowRoot,
-            html`${this.styles}
-                <div class="terminal-out-container" tabindex="-1">
-                    ${this._outAnchor} ${this._outElt}
-                </div>
-                ${this._inElt}`,
-        );
+        if (this.isConnected && this.shadowRoot) {
+            render(
+                this.shadowRoot,
+                html`${this.styles}
+                    <div class="terminal-out-container" tabindex="-1">
+                        ${this._outAnchor} ${this._outElt}
+                    </div>
+                    ${this._inElt}`,
+            );
+            if (this._whenReady) {
+                this._whenReady(this);
+                delete this._whenReady;
+            }
+        }
     }
 
+    select() {
+        if (this.parentElement && this.parentElement instanceof BorbFrame) {
+            this.parentElement.select(this);
+        }
+    }
+
+    ensureId() {
+        if (!this.id) uniqueId('terminal', this);
+        return this.id;
+    }
     scrollToBottom() {
         this._outAnchor.scrollIntoView();
     }
@@ -188,14 +215,13 @@ const _self = {
     _revision: revision,
     BorbTerminal,
 };
-export const Terminals = _self;
-export default Terminals;
 
-SubSystem.declare(_self)
+export const Terminals = SubSystem.declare(_self)
     .reloadable(true)
     .depends('dom', Styles, Settings, history, LineEditors)
     .elements(BorbTerminal)
     .register();
+export default Terminals;
 
 if (import.meta.webpackHot) {
     import.meta.webpackHot.accept();

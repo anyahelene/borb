@@ -583,14 +583,13 @@ const _self = {
     createEditor,
     TDEditor,
 };
-export const Editor = _self;
-export default Editor;
 
-SubSystem.declare(_self)
+export const Editor = SubSystem.declare(_self)
     .reloadable(true)
     .depends('dom')
     //    .elements(BorbTerminal)
     .register();
+export default Editor;
 
 if (import.meta.webpackHot) {
     import.meta.webpackHot.accept();

@@ -2,6 +2,7 @@ import StackTrace from 'stacktrace-js';
 import { cloneDeepWith, fromPairs, toPairs } from 'lodash-es';
 import SubSystem from './SubSystem';
 import { sysId } from './Common';
+import { html, render } from 'uhtml';
 type Router = typeof _self;
 
 const revision: number =
@@ -12,7 +13,23 @@ const previousVersion: typeof _self =
     import.meta.webpackHot && import.meta.webpackHot.data
         ? import.meta.webpackHot.data['self']
         : undefined;
-
+interface LogEntry {
+    message: Message;
+    connection?: Connection;
+    timestamp: number;
+    error?: Error;
+    handler?: Monitor<Payload> | Method;
+    status: string;
+}
+export class MessagingError extends Error {
+    msg: Message;
+    reply?: Message | Payload;
+    constructor(message: string, msg: Message, reply?: Message | Payload) {
+        super(`${message}: ${JSON.stringify(msg)}`);
+        this.msg = msg;
+        this.reply = reply;
+    }
+}
 export function fromMap<T>(value: T): T {
     function converter(value: unknown) {
         if (value instanceof Map) {
@@ -32,14 +49,6 @@ export interface Connection {
     enqueue(data: Message, ...buffers: ArrayBuffer[]): void;
 
     deliverHost: (msg: Message) => Promise<void>;
-
-    addHandlers(
-        owner: string,
-        connectHandler: (conn: Connection, info: Payload) => void,
-        disconnectHandler: (conn: Connection) => void,
-    ): void;
-
-    removeHandlers(owner: string): void;
 }
 
 export interface Message {
@@ -70,6 +79,21 @@ type Monitor<T extends Payload> = {
     reject: (err: Error) => void;
 };
 
+function formatLogEntry(entry: LogEntry) {
+    const header = entry.message.header;
+
+    return html`<tr>
+        <td>${entry.timestamp}</td>
+        <td>${entry.status}</td>
+        <td>${header.msg_type}</td>
+        <td>${header.msg_id}</td>
+        <td>${header.from}</td>
+        <td>${header.to}</td>
+        <td>${JSON.stringify(entry.message.content)}</td>
+        <td>${entry.connection?.id || entry.handler}</td>
+        <td>${JSON.stringify(entry.error)}</td>
+    </tr>`;
+}
 class MessagingImpl {
     _id = sysId(import.meta.url);
     _revision = revision;
@@ -78,15 +102,47 @@ class MessagingImpl {
     routes = new Map<string, Method<Payload, Payload>>();
     requests = new Map<string, Monitor<Payload>>();
     seq = 0;
+    private _logging: boolean;
+    private _log: LogEntry[] = [];
     constructor() {
         //
     }
 
-    route<T extends Payload>(msgType: string, route: Method<T>) {
+    public showLog(dest: HTMLElement) {
+        render(
+            dest,
+            html`<table>
+                <tr>
+                    <th>Time</th>
+                    <th>Status</th>
+                    <th>Type</th>
+                    <th>Id</th>
+                    <th>From</th>
+                    <th>To</th>
+                    <th>Content</th>
+                    <th>Route</th>
+                    <th>Error</th>
+                </tr>
+                ${this._log.map(formatLogEntry)}
+            </table>`,
+        );
+    }
+    public route<T extends Payload>(msgType: string, route: Method<T>) {
         this.routes.set(msgType, route);
     }
 
-    connect(conn: Connection, ...channels: string[]) {
+    public connect(conn: Connection, ...channels: string[]) {
+        const enqueue = (message: Message) => {
+            const logEntry: LogEntry = {
+                message,
+                connection: conn,
+                timestamp: Date.now(),
+                status: 'ok',
+            };
+            this._log.push(logEntry);
+            conn.enqueue(message);
+        };
+
         if (this.connections.has(conn.id)) {
             throw new Error(`Connection already added: ${conn.id}`);
         } else {
@@ -101,20 +157,20 @@ class MessagingImpl {
                     msg = fromMap(msg);
                 }
                 msg.header.from = conn.id;
-                msg.header.to = 'local:';
-                const promise = msg.header.ref_id
-                    ? this.deliverLocalReply(msg)
-                    : this.deliverLocalRequest(msg);
+                if (!msg.header.to) msg.header.to = 'local:';
+                const promise = this._send(msg);
                 if (promise) {
                     return promise
                         .then(
                             (content) =>
-                                conn.enqueue({
+                                enqueue({
                                     header: {
                                         msg_type:
                                             msg.header.msg_type + '_reply',
                                         msg_id: `${this.seq++}`,
                                         ref_id: msg.header.msg_id,
+                                        from: 'local:',
+                                        to: conn.id,
                                     },
                                     content,
                                 }),
@@ -128,7 +184,7 @@ class MessagingImpl {
                                 //     content: { status: 'error' },
                                 // }),
                                 this.errorMsg(msg.header.msg_id, err).then(
-                                    conn.enqueue,
+                                    enqueue,
                                 ),
                         )
                         .catch((err) => {
@@ -143,9 +199,18 @@ class MessagingImpl {
     }
 
     /** Returns a promise of a reply to the request; reject if no route was found */
-    deliverRemoteRequest(msg: Message): Promise<Payload> {
+    private _deliverRemoteRequest(msg: Message): Promise<Payload> {
+        const logEntry: LogEntry = {
+            message: msg,
+            timestamp: Date.now(),
+            status: 'pending',
+        };
+        this._log.push(logEntry);
+        console.log('deliverRemoteRequest(%o)', msg);
         const socketSendRequest = (conn: Connection): Promise<Payload> => {
+            logEntry.connection = conn;
             try {
+                logEntry.status = 'ok';
                 return new Promise((resolve, reject) => {
                     console.log(
                         'deliverRemoteRequest(%o) to conn=%o',
@@ -160,7 +225,9 @@ class MessagingImpl {
                     conn.enqueue(msg);
                 });
             } catch (e) {
+                logEntry.error = e;
                 console.error('remote delivery error:', e);
+                logEntry.status = 'error';
                 throw e;
                 // if (e instanceof Error && e.name.startsWith('Jest')) {
                 // }
@@ -174,18 +241,26 @@ class MessagingImpl {
         }
         const channels = this.channels.get(msg.header.to) ?? [];
         if (channels.length > 0) {
-            return Promise.race(channels.map((ch) => socketSendRequest(conn)));
+            return Promise.race(channels.map((ch) => socketSendRequest(ch)));
         }
-        return Promise.reject(
-            new Error(`No route for ${JSON.stringify(msg.header)}`),
-        );
+        const err = new MessagingError('No route for message', msg);
+        logEntry.error = err;
+        return Promise.reject(err);
     }
 
     /** Returns a promise of a reply to the request, or void if no route was found */
-    deliverLocalRequest(msg: Message): Promise<Payload> | void {
+    private _deliverLocalRequest(msg: Message): Promise<Payload> | void {
         const method = this.routes.get(msg.header.msg_type);
+        const logEntry: LogEntry = {
+            message: msg,
+            handler: method,
+            timestamp: Date.now(),
+            status: 'pending',
+        };
+        this._log.push(logEntry);
         if (method) {
             console.log('deliverLocalRequest(%o)', msg);
+            logEntry.status = 'ok';
             let promise: Promise<Payload>;
             try {
                 promise = Promise.resolve(
@@ -193,34 +268,46 @@ class MessagingImpl {
                 );
             } catch (e) {
                 console.error('local delivery error:', e);
+                logEntry.status = 'error';
+                logEntry.error = e;
                 promise = Promise.reject(e);
             }
             console.log('=>', promise);
             return promise;
         }
+        logEntry.status = 'drop';
+        console.warn('no route for deliverLocalRequest(%o)', msg);
     }
     /** Returns true if the reply was delivered, false otherwise */
-    deliverLocalReply(msg: Message): Promise<Payload> | void {
+    private _deliverLocalReply(msg: Message): Promise<Payload> | void {
         const id = `${msg.header.from || ''}:${msg.header.ref_id}`;
         const replyHandler = this.requests.get(id);
+        const logEntry: LogEntry = {
+            message: msg,
+            handler: replyHandler,
+            timestamp: Date.now(),
+            status: 'pending',
+        };
+        this._log.push(logEntry);
         if (replyHandler) {
             console.log('deliverLocalReply(%o)', msg);
+            logEntry.status = 'ok';
             this.requests.delete(id);
             if (msg.header.msg_type !== 'error_reply')
                 replyHandler.resolve(msg.content);
-            else replyHandler.reject(new Error(JSON.stringify(msg.content)));
+            else replyHandler.reject(new MessagingError('Error', msg));
             return;
         } else {
             console.warn('unexpected reply:', id, msg);
-            return /*Promise.reject(
-            new Error(`unexpected reply ${JSON.stringify(msg.header)}`),
-        )*/;
+            logEntry.status = 'drop';
+            logEntry.error = new MessagingError('unexpected reply', msg);
+            return;
         }
     }
 
-    errorMsg(ref_id: string, err: Error): Promise<Message> {
-        //return StackTrace.fromError(err)
-        return Promise.resolve([]).then((st) => ({
+    public async errorMsg(ref_id: string, err: Error): Promise<Message> {
+        const st = await StackTrace.fromError(err);
+        return {
             header: {
                 msg_type: 'error_reply',
                 msg_id: `${this.seq++}`,
@@ -232,9 +319,10 @@ class MessagingImpl {
                 evalue: err.message,
                 traceback: st,
             },
-        }));
+        };
     }
-    reply(msg: Message, content: Payload) {
+    public reply(msg: Message, content: Payload): Message {
+        if (!content) content = { status: 'ok' };
         if (!content.status) content.status = 'ok';
         return {
             header: {
@@ -245,25 +333,39 @@ class MessagingImpl {
             content,
         };
     }
-    send(payload: Payload, msgType: string, to?: string): Promise<Payload> {
+    public async send(
+        payload: Payload,
+        msgType: string,
+        to?: string,
+    ): Promise<Payload> {
         const msg: Message = {
             header: { msg_type: msgType, msg_id: `${this.seq++}` },
             content: payload,
         };
         if (!to) to = 'local:';
         msg.header.to = to;
-
-        if (to === 'local:') {
-            const res = this.deliverLocalRequest(msg);
-            console.log(res);
-            return (
-                res ||
-                Promise.reject(
-                    new Error(`No route for ${JSON.stringify(msg.header)}`),
-                )
-            );
-        } else return this.deliverRemoteRequest(msg);
+        return (
+            this._send(msg) ||
+            Promise.reject(new MessagingError('No route for message', msg))
+        );
     }
+
+    _send(msg: Message) {
+        if (msg.header.to === 'local:') {
+            return msg.header.ref_id
+                ? this._deliverLocalReply(msg)
+                : this._deliverLocalRequest(msg);
+        } else return this._deliverRemoteRequest(msg);
+    }
+
+    public set logging(enabled: boolean) {
+        this._logging = enabled;
+    }
+    public get logging(): boolean {
+        return this._logging;
+    }
+
+    fromMap = fromMap;
 }
 export class BaseConnection {
     queue: [Message, Transferable[]][] = [];
@@ -273,11 +375,17 @@ export class BaseConnection {
         (conn: Connection, info: Payload) => void
     >();
     disconnectHandler = new Map<string, (conn: Connection) => void>();
-    constructor(public router: typeof Messaging, public id: string) {
-        this.deliverHost = router.connect(this);
+    channels: string[];
+    constructor(
+        public router: typeof Messaging,
+        public id: string,
+        ...channels: string[]
+    ) {
+        this.deliverHost = router.connect(this, ...channels);
+        this.channels = channels;
     }
     enqueue = (msg: Message, ...buffers: Transferable[]): void => {
-        console.log('enqueue(%o)', msg);
+        console.log('enqueue(%s,%o)', JSON.stringify(msg.header), msg);
         this.queue.push([msg, buffers]);
         if (this.queue.length === 1) queueMicrotask(() => this.processQueue());
     };
@@ -286,6 +394,7 @@ export class BaseConnection {
         let msg: [Message, Transferable[]] | undefined;
         console.log('processing queue');
         while ((msg = this.queue.shift())) {
+            console.log('delivering to', this.id, msg);
             this.deliverRemote(...msg);
         }
         console.log('processing done');
@@ -308,18 +417,20 @@ export class BaseConnection {
         this.disconnectHandler.delete(owner);
     }
     send(msg: Message): void | Promise<void | Payload> {
-        throw new Error('Function not implemented.');
+        throw new MessagingError('Function not implemented', msg);
     }
 }
 
 const _self = new MessagingImpl();
 
-export const Messaging = _self;
 export function createMessaging() {
     return new MessagingImpl();
 }
 
-SubSystem.declare(_self).reloadable(false).depends().register();
+export const Messaging = SubSystem.declare(_self)
+    .reloadable(false)
+    .depends()
+    .register();
 
 if (import.meta.webpackHot) {
     import.meta.webpackHot.decline();

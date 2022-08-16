@@ -231,7 +231,7 @@ function enterDropTarget(tgt: HTMLElement, ev: DragEvent, oldTgt: HTMLElement) {
     }
 }
 function handlers() {
-    return SubSystem.getApi<typeof self>(subsys_id).handlers;
+    return SubSystem.getApi<typeof _self>(subsys_id).handlers;
 }
 const _dragenter = (ev: DragEvent) => handlers().dragenter(ev),
     _dragleave = (ev: DragEvent) => handlers().dragleave(ev),
@@ -380,7 +380,7 @@ function drop(ev: DragEvent) {
     }
 }
 
-const self = {
+const _self = {
     DragState,
     dragState,
     attachDraggable,
@@ -390,11 +390,9 @@ const self = {
     BorbDragEvent,
     handlers: { dragstart, dragend, dragover, dragenter, dragleave, drop },
 };
-export const DragNDrop = self;
-export default DragNDrop;
 const subsys_id = `borb/${subsys_name.toLowerCase()}`;
 const globalListener = (ev: DragEvent) => ev.preventDefault();
-SubSystem.declare(subsys_id, self, revision)
+export const DragNDrop = SubSystem.declare(subsys_id, _self, revision)
     .reloadable(true)
     .depends('dom')
     .start((self, dep) => {
@@ -404,6 +402,7 @@ SubSystem.declare(subsys_id, self, revision)
         return DragNDrop;
     })
     .register();
+export default DragNDrop;
 
 if (import.meta.webpackHot) {
     import.meta.webpackHot.accept();
@@ -416,6 +415,6 @@ if (import.meta.webpackHot) {
         document.removeEventListener('dragover', globalListener);
         dragState.reset();
         data['revision'] = revision;
-        data['self'] = self;
+        data['self'] = _self;
     });
 }

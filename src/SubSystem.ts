@@ -78,8 +78,11 @@ class SubSysBuilder<T extends object> {
         return this;
     }
 
-    register(): Promise<void> {
-        return Dependency.register(this.sys);
+    register(): T {
+        const api = this.sys.api || this.sys.prototype;
+        if (!api) throw new Error('no api object');
+        Dependency.register(this.sys);
+        return api;
     }
 
     elements(...customElements: typeof BorbElement[]): this {
@@ -90,18 +93,70 @@ class SubSysBuilder<T extends object> {
 function nop() {
     //
 }
+const AsyncFunction = async function () {}.constructor;
+function proxy<T extends object>(
+    obj: T,
+    dep: Dependency<T>,
+    hotReload: boolean,
+) {
+    return new Proxy(obj, {
+        get(target, p, receiver) {
+            // get newest version
+            if (hotReload) {
+                const refreshed = SubSystem.get(dep.name) as Dependency<T>;
+                if (refreshed !== dep) {
+                    console.log('Subsystem refreshed: %s', dep.name, dep);
+                    dep = refreshed;
+                }
+            }
+            if (dep.isStarted()) {
+                return dep.api[p];
+            } else if (dep.api[p] instanceof AsyncFunction) {
+                console.trace(`using proxy for ${dep.name}.${String(p)}`);
+                // wrap it in an object to get correct name
+                const funcObj: any = {
+                    async [p](...args: any[]) {
+                        const api = await SubSystem.waitFor(dep.name);
+                        if (api) {
+                            const fn = api[p];
+                            if (typeof fn === 'function' && !fn.proxy) {
+                                console.trace(
+                                    `calling proxy for ${name}.${String(p)}`,
+                                );
+                                return fn(args);
+                            }
+                        }
+                        throw new TypeError(`${String(p)} is not a function`);
+                    },
+                };
+                const f = funcObj[p]; // as (...args:any[]) => Promise<any>;
+                f.proxy = true;
+                return f;
+            } else {
+                throw new Error(
+                    `Accessing ${dep.name}.${String(p)} before ${
+                        dep.name
+                    } is ready`,
+                );
+            }
+        },
+    });
+}
 export class Dependency<T extends object> {
     public static targetObject: TargetObject;
     private static counter = 0;
     private static systems = new Map<string, Dependency<object>>();
     private static queue: SubSystem<object>[] = [];
+    private static makeProxies = false;
+    private static hotReload = false;
+    private _name: string;
+    proxy: T;
     promise: Promise<SubSystem<T>>;
     resolve: (value: SubSystem<T> | PromiseLike<SubSystem<T>>) => void = nop;
     reject: (reason: Error) => void = nop;
     deps: Set<Dependency<object>> = new Set();
     id: number = Dependency.counter++;
 
-    private _name: string;
     public get name(): string {
         return this._name;
     }
@@ -168,6 +223,8 @@ export class Dependency<T extends object> {
         let sys = Dependency.systems.get(sysName);
         if (!sys) {
             sys = new Dependency(sysName);
+            if (Dependency.makeProxies)
+                sys.proxy = proxy({}, sys, Dependency.hotReload);
             Dependency.systems.set(sysName, sys);
         }
         return sys;
@@ -177,8 +234,15 @@ export class Dependency<T extends object> {
         const sys = Dependency.get(sysName) as Dependency<T>;
         return sys._api;
     }
-    static setup(targetObject: TargetObject) {
+    static setup(
+        targetObject: TargetObject,
+        config?: { proxy: boolean; hotReload: boolean; global: boolean },
+    ) {
+        if (config?.global) globalThis.SubSystem = _self;
         Dependency.targetObject = targetObject;
+        Dependency.makeProxies = !!config?.proxy;
+        Dependency.hotReload = !!config?.hotReload;
+
         if (targetObject && !targetObject['borb']) {
             targetObject['borb'] = { subSystem: _self };
         }
@@ -197,6 +261,13 @@ export class Dependency<T extends object> {
     }
     static register(sys: SubSystem<object>) {
         const depsys = Dependency.get(sys.name);
+        if (Dependency.makeProxies) {
+            depsys.proxy = proxy(
+                sys.prototype ?? {},
+                depsys,
+                Dependency.hotReload,
+            );
+        }
         if (!Dependency.targetObject) {
             Dependency.queue.push(sys);
             console.log(`System not ready, enqueing '${sys.name}'`);
@@ -228,6 +299,7 @@ export class Dependency<T extends object> {
         //if(typeof api === "function")
         //    this._api = api();
         //else
+        if (!api) api = this.proxy;
         this._api = api;
 
         if (this._api) {

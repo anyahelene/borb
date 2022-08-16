@@ -48,13 +48,22 @@ interface EditorService {
 }
 interface Shell {
     eval(line: string, outputElement?: HTMLElement): Promise<number>;
-    printer: Printer;
     history: HistorySession;
+    languageName: string;
+    shellName: string;
+}
+interface Language {
+    name: string;
+    shellName: string;
+    editMode: string;
 }
 interface Editor {
     focus(): void;
     attach(elt: HTMLElement): void;
     dispose(): void;
+}
+interface Prompt {
+    more?: string;
 }
 const historyKeys = {
     arrowUp: 'prev',
@@ -66,31 +75,22 @@ export class LineEditor {
     public editor: TDEditor;
     public history: HistorySession;
     public terminal: BorbTerminal;
-    private _inElt: HTMLElement;
-    private _outElt: HTMLElement;
-    private _shell: Shell;
     histCommands: { [key: string]: () => Promise<Entry> };
-
+    private _seq = 1;
+    public beforeEnter: (line: string, LineEditor: this) => boolean;
+    public afterEnter: (line: string, LineEditor: this) => void;
+    public onEnter: (
+        line: string,
+        lineId: number,
+        outputElement: HTMLElement,
+        lineEditor: this,
+    ) => Promise<Prompt>;
     focus(): void {
         this.editor.focus();
     }
 
-    constructor(
-        term: BorbTerminal,
-        inElt: HTMLElement,
-        outElt: HTMLElement,
-        lang?: string,
-    ) {
+    constructor(term: BorbTerminal, lang?: Language) {
         this.terminal = term;
-        this._inElt = inElt;
-        this._outElt = outElt;
-        this.editor = createLineEditor(
-            this._inElt,
-            '',
-            'shell' || 'plain',
-            (key, state, dispatch) => this.handleKey(key, state, dispatch),
-            term.shadowRoot,
-        );
         this.histCommands = {
             arrowUp: () => this.history.prev(),
             arrowDown: () => this.history.next(),
@@ -98,20 +98,33 @@ export class LineEditor {
             pageDown: () => this.history.last(),
         };
         this.terminal.status = 'waiting';
-        const shellName = 'tshell';
-        const p1 = SubSystem.waitFor<Shell>('tshell').then((sh) => {
-            this._shell = sh;
-            this._shell.printer = this.terminal;
-        });
+
+        const shellName = lang?.shellName || '';
         const settings = SubSystem.getApi<typeof Settings>('borb/settings');
         const session = settings.getConfig('session.name', '_');
         const historyId = (session + '/' + shellName).replace(' ', '');
-        const p2 = SubSystem.getApi<History>(history._id)
-            .forSession(historyId)
-            .then((hist) => (this.history = hist));
-        Promise.all([p1, p2]).then(() => {
+        console.log('waiting for terminal and history...');
+        Promise.all([
+            this.terminal.whenReady.then(() => {
+                console.log('terminal ready');
+                this.terminal.lineEditor = this;
+                this.editor = createLineEditor(
+                    this.terminal.inputElement,
+                    '',
+                    lang?.editMode || 'plain',
+                    (key, state, dispatch) =>
+                        this.handleKey(key, state, dispatch),
+                    this.terminal.shadowRoot,
+                );
+            }),
+            SubSystem.getApi<History>(history._id)
+                .forSession(historyId)
+                .then((hist) => {
+                    console.log('history ready');
+                    this.history = hist;
+                }),
+        ]).then(() => {
             this.terminal.status = 'ready';
-            this._shell.history = this.history;
         });
     }
 
@@ -124,10 +137,25 @@ export class LineEditor {
         const line = state.sliceDoc(0);
         if (!this.history) return false;
         if (key === 'enter') {
-            this.enter(state, dispatch).finally(
-                () => (this.terminal.status = 'ready'),
-            );
-            return true;
+            if (!this.beforeEnter || this.beforeEnter(line, this)) {
+                this.enter(state, dispatch)
+                    .then((res) => {
+                        if (res && res.more) {
+                            this.history.edit(res.more);
+                            replaceDoc(state, dispatch, res.more);
+                        }
+                        if (this.afterEnter) this.afterEnter(line, this);
+                        return res;
+                    })
+                    .catch((err) => {
+                        console.error('INTERNAL ERROR', err);
+                        this.terminal.print(`*** Internal error: ${err}`);
+                    })
+                    .finally(() => (this.terminal.status = 'ready'));
+                return true;
+            } else {
+                return false;
+            }
         } else if (this.histCommands[key]) {
             this.history
                 .edit(line)
@@ -143,21 +171,20 @@ export class LineEditor {
         return false;
     }
 
-    async enter(
-        state: EditorState,
-        dispatch: (tr: Transaction) => void,
-    ): Promise<number> {
+    async enter(state: EditorState, dispatch: (tr: Transaction) => void) {
         this.terminal.status = 'running';
         const line = state.sliceDoc();
-        const id = await this.history.enter(line);
+        const id = this.history ? await this.history.enter(line) : this._seq++;
         const elt = this.editor.highlightTree(
             html.node`<span class="prompt" data-user="">[${id}]</span>`,
         );
         elt.classList.add('block');
         replaceDoc(state, dispatch, '');
         this.terminal.printElement(elt);
-        const ret = await this._shell.eval(line, elt);
-        return ret;
+        if (this.onEnter) {
+            const ret = this.onEnter(line, id, elt, this);
+            return ret;
+        }
     }
     disableHistory(): void {
         //
@@ -324,14 +351,13 @@ const _self = {
     _revision: revision,
     LineEditor,
 };
-export const LineEditors = _self;
-export default LineEditors;
 
-SubSystem.declare(_self)
+export const LineEditors = SubSystem.declare(_self)
     .reloadable(true)
     .depends('dom', history, Editor)
     .elements()
     .register();
+export default LineEditors;
 
 if (import.meta.webpackHot) {
     import.meta.webpackHot.accept();

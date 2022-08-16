@@ -19,7 +19,7 @@ function make_key(s: string, id?: number): [string, string, number?] {
     if (id !== undefined) key.push(id);
     return key;
 }
-interface Session {
+export interface Session {
     session: string;
     shell: string;
     id: number;
@@ -121,11 +121,11 @@ export interface HistorySession {
 export interface History {
     _id: string;
     _revision: number;
-    forSession(session: string): Promise<HistorySession>;
+    forSession(session: string, persistent?: boolean): Promise<HistorySession>;
     get(session: string, id?: number): Promise<Entry>;
     put(session: string, data: string, id?: number): Promise<number>;
     list(session: string): Promise<Entry[]>;
-    sessions(sortBy: string): Promise<Session[]>;
+    sessions(sortBy?: string): Promise<Session[]>;
     currentId(session: string): Promise<number>;
 }
 
@@ -236,8 +236,13 @@ class DBHistorySession implements HistorySession {
 const DBHistory: History = {
     _id: id,
     _revision: revision,
-    async forSession(session: string): Promise<HistorySession> {
-        const hist = new DBHistorySession(session);
+    async forSession(
+        session: string,
+        persistent = true,
+    ): Promise<HistorySession> {
+        const hist = persistent
+            ? new DBHistorySession(session)
+            : new FakeHistorySession(session);
         await hist.init();
         return hist;
     },
@@ -459,10 +464,8 @@ const _self_proto = {
         );
     },
 };
-export let history: History = _self_proto;
-export default history;
 
-SubSystem.declare(_self_proto)
+export let history: History = SubSystem.declare(_self_proto)
     .reloadable(true)
     .depends()
     .elements()
@@ -479,6 +482,7 @@ SubSystem.declare(_self_proto)
         return history;
     })
     .register();
+export default history;
 
 if (import.meta.webpackHot) {
     import.meta.webpackHot.decline();

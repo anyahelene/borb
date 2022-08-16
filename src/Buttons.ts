@@ -276,11 +276,11 @@ const _self = {
     ctrlSymbols,
     keyboardSymbols,
 };
-export const Buttons = _self;
-export default Buttons;
 
-SubSystem.declare('borb/buttons', _self, revision)
+export const Buttons = SubSystem.declare('borb/buttons', _self, revision)
     .reloadable(false)
     .depends('dom', Styles)
     .elements(BorbButton, BorbCommand)
     .register();
+
+export default Buttons;

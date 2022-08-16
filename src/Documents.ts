@@ -193,15 +193,13 @@ const _self = {
     BorbDocument,
     styleRef,
 };
-export const Documents = _self;
 
-export default Documents;
-
-SubSystem.declare(_self)
+export const Documents = SubSystem.declare(_self)
     .reloadable(true)
     .depends('dom', Styles)
     .elements(BorbDocument)
     .register();
+export default Documents;
 
 if (import.meta.webpackHot) {
     import.meta.webpackHot.accept();
