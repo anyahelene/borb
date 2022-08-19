@@ -1,4 +1,4 @@
-import SubSystem from './SubSystem';
+import Systems from './SubSystem';
 import { sysId, tagName, uniqueId } from './Common';
 import { BorbBaseElement } from './BaseElement';
 import { html, render } from 'uhtml';
@@ -194,7 +194,7 @@ const _self = {
     styleRef,
 };
 
-export const Documents = SubSystem.declare(_self)
+export const Documents = Systems.declare(_self)
     .reloadable(true)
     .depends('dom', Styles)
     .elements(BorbDocument)

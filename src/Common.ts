@@ -136,3 +136,7 @@ export function interpolate(s: string, data: { [attr: string]: string }) {
         }
     }
 }
+
+export function isPromise(obj: any | Promise<any>): obj is Promise<any> {
+    return typeof obj?.['then'] === 'function';
+}

@@ -3,7 +3,7 @@ import { html, render } from 'uhtml';
 import { BorbBaseElement } from './BaseElement';
 import { sysId, tagName } from './Common';
 import Styles, { load } from './Styles';
-import { SubSystem } from './SubSystem';
+import Systems from './SubSystem';
 
 const revision: number =
     import.meta.webpackHot && import.meta.webpackHot.data
@@ -109,6 +109,7 @@ export function loadConfig() {
     } catch (e) {
         console.error(e);
     }
+    return _self;
 }
 
 const saveConfigTimers: { [configName: string]: number } = {};
@@ -243,12 +244,12 @@ const _self = {
     toLowerCase,
 };
 
-export const Settings = SubSystem.declare(_self)
-.reloadable(true)
-.depends()
-.elements(BorbSettings)
-.start(() => loadConfig())
-.register();
+export const Settings = Systems.declare(_self)
+    .reloadable(true)
+    .depends()
+    .elements(BorbSettings)
+    .start(() => loadConfig())
+    .register();
 
 export default Settings;
 

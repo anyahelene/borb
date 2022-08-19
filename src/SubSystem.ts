@@ -1,92 +1,90 @@
 import type { BorbElement } from './BaseElement';
-import { interpolate, upgradeElements } from './Common';
-
+import { interpolate, isPromise, upgradeElements } from './Common';
+import { set } from 'lodash-es';
 // eslint-disable no-unused-vars
 enum State {
     STOPPED,
     WAITING,
     STARTING,
     STARTED,
+    NEW,
 }
-export interface SubSystem<T extends object> {
-    customElements?: typeof BorbElement[];
-    name: string;
-    depends?: Iterable<string>;
-    start?(
-        self: SubSystem<T>,
-        dep: Dependency<T>,
-    ): Promise<T | void> | T | void;
-    stop?(): Promise<void> | void;
-    api?: T;
-    prototype?: T;
-    reloadable?: boolean;
-    revision: number;
-}
-
+type API = {};
 interface TargetObject {
     [propName: string]: object;
 }
-class SubSysBuilder<T extends object> {
+class SubSysBuilder<T extends { _id?: string; _revision?: number }> {
+    data: SysData<T>;
     sys: SubSystem<T>;
-    private _depends: string[];
 
-    constructor(name: string, proto: T, revision: number) {
-        this._depends = [];
-        this.sys = {
-            name,
-            depends: this._depends,
-            reloadable: true,
+    constructor(name: string, protoOrApi: T | (new () => T), revision: number) {
+        this.sys = SubSystem.get(name);
+        if (this.sys.data)
+            revision = Math.max(this.sys.data.revision + 1, revision);
+        this.sys._newData = this.data = {
             revision,
+            deps: new Set<SubSystem<API>>(),
+            api: undefined,
+            proto: undefined,
+            stop: undefined,
+            start: undefined,
+            state: State.STOPPED,
+            customElements: [],
+            reloadable: true,
         };
-        if (proto) this.sys.prototype = proto;
+        if (typeof protoOrApi === 'function') {
+            this.data.proto = protoOrApi;
+        } else if (typeof protoOrApi === 'object') {
+            this.data.api = protoOrApi;
+        }
     }
 
     depends(...deps: (string | { _id: string })[]): this {
-        this._depends.push(
-            ...deps.map((d) => (typeof d === 'string' ? d : d._id)),
-        );
+        for (const d of deps) {
+            this.data.deps.add(
+                SubSystem.get(typeof d === 'string' ? d : d._id),
+            );
+        }
+
         return this;
     }
 
     stop(handler: () => Promise<void> | void): this {
-        this.sys.stop = handler;
+        this.data.stop = handler;
         return this;
     }
 
-    start(
-        handler: (
-            self: SubSystem<T>,
-            dep: Dependency<T>,
-        ) => Promise<T | void> | T | void,
-    ): this {
-        this.sys.start = handler;
+    start(handler: (sys: SubSystem<T>) => Promise<T> | T): this {
+        this.data.start = handler;
         return this;
     }
 
-    prototype(proto: T): this {
-        this.sys.prototype = proto;
+    prototype(proto: T | (new () => T)): this {
+        this.data.proto = proto;
         return this;
     }
 
     api(api: T): this {
-        this.sys.api = api;
+        this.data.api = api;
+        api['_id'] = this.sys.name;
+        api['_revision'] = this.data.revision;
         return this;
     }
 
     reloadable(reloadable: boolean): this {
-        this.sys.reloadable = reloadable;
+        this.data.reloadable = reloadable;
         return this;
     }
 
-    register(): T {
-        const api = this.sys.api || this.sys.prototype;
-        if (!api) throw new Error('no api object');
-        Dependency.register(this.sys);
-        return api;
+    register(): T & { _id: string; _revision: number } {
+        SubSystem.register(this.sys.name, this.data);
+        const api = this.sys.proxy || this.data.api;
+
+        return api as T & { _id: string; _revision: number };
     }
 
     elements(...customElements: typeof BorbElement[]): this {
-        this.sys.customElements = customElements;
+        this.data.customElements.push(...customElements);
         return this;
     }
 }
@@ -94,37 +92,38 @@ function nop() {
     //
 }
 const AsyncFunction = async function () {}.constructor;
-function proxy<T extends object>(
-    obj: T,
-    dep: Dependency<T>,
-    hotReload: boolean,
-) {
+function proxy<T extends API>(target: T | (new () => T), dep: SubSystem<T>) {
+    let obj = typeof target === 'function' ? target.prototype : target;
     return new Proxy(obj, {
         get(target, p, receiver) {
             // get newest version
-            if (hotReload) {
-                const refreshed = SubSystem.get(dep.name) as Dependency<T>;
-                if (refreshed !== dep) {
+            /*
+            if (SubSystem.hotReload) {
+                const refreshed = dep.data.api;
+                if (refreshed && refreshed !== obj) {
                     console.log('Subsystem refreshed: %s', dep.name, dep);
-                    dep = refreshed;
+                    obj = refreshed;
                 }
-            }
-            if (dep.isStarted()) {
-                return dep.api[p];
-            } else if (dep.api[p] instanceof AsyncFunction) {
+            }*/
+            if (p === '_id') return dep.name;
+            else if (p === '_revision') return dep.data.revision;
+            else if (p === '_proxy') return true;
+            else if (p === '_proxied') return obj;
+
+            if (dep.data) {
+                return dep.data.api[p];
+            } else if (obj[p] instanceof AsyncFunction) {
                 console.trace(`using proxy for ${dep.name}.${String(p)}`);
                 // wrap it in an object to get correct name
                 const funcObj: any = {
                     async [p](...args: any[]) {
-                        const api = await SubSystem.waitFor(dep.name);
-                        if (api) {
-                            const fn = api[p];
-                            if (typeof fn === 'function' && !fn.proxy) {
-                                console.trace(
-                                    `calling proxy for ${name}.${String(p)}`,
-                                );
-                                return fn(args);
-                            }
+                        await SubSystem.waitFor<T>(dep.name);
+                        const fn = dep.data?.api[p];
+                        if (typeof fn === 'function' && !fn.proxy) {
+                            console.trace(
+                                `calling proxy for ${name}.${String(p)}`,
+                            );
+                            return fn(args);
                         }
                         throw new TypeError(`${String(p)} is not a function`);
                     },
@@ -133,6 +132,14 @@ function proxy<T extends object>(
                 f.proxy = true;
                 return f;
             } else {
+                console.error(
+                    `Accessing ${dep.name}.${String(p)} before ${
+                        dep.name
+                    } is ready`,
+                    target,
+                    p,
+                    receiver,
+                );
                 throw new Error(
                     `Accessing ${dep.name}.${String(p)} before ${
                         dep.name
@@ -142,33 +149,47 @@ function proxy<T extends object>(
         },
     });
 }
-export class Dependency<T extends object> {
+type SysData<T extends API> = {
+    stop: () => Promise<void> | void;
+    start: (sys: SubSystem<T>) => Promise<T> | T;
+    deps: Set<SubSystem<API>>;
+    proto?: T | (new () => T);
+    reloadable?: boolean;
+    revision: number;
+    api: T;
+    customElements?: typeof BorbElement[];
+    state: State;
+};
+export class SubSystem<T extends API> {
     public static targetObject: TargetObject;
     private static counter = 0;
-    private static systems = new Map<string, Dependency<object>>();
-    private static queue: SubSystem<object>[] = [];
-    private static makeProxies = false;
-    private static hotReload = false;
-    private _name: string;
-    proxy: T;
+    private static systems = new Map<string, SubSystem<API>>();
+    private static queue: SubSystem<API>[] = [];
+    private static makeProxies = true;
+    private static alwaysProxy = false;
+    private static ready = false;
+    private static setupPromise = new Promise<TargetObject>((resolve) => {
+        SubSystem.setupResolve = resolve;
+    });
+    static setupResolve: (value: TargetObject) => void;
+    static #hotReload = false;
     promise: Promise<SubSystem<T>>;
-    resolve: (value: SubSystem<T> | PromiseLike<SubSystem<T>>) => void = nop;
-    reject: (reason: Error) => void = nop;
-    deps: Set<Dependency<object>> = new Set();
-    id: number = Dependency.counter++;
+    resolve: (value: SubSystem<T> | PromiseLike<SubSystem<T>>) => void;
+    reject: (reason: Error) => void;
+    readonly name: string;
+    id: number;
+    data: SysData<T>;
+    _newData: SysData<T>;
+    proxy: T;
 
-    public get name(): string {
-        return this._name;
+    public static get hotReload() {
+        return SubSystem.#hotReload;
     }
-
-    private _api?: T;
     public get api(): T | undefined {
-        return this._api;
+        return this.data.api;
     }
-    private state = State.STOPPED;
-    private subsystem?: SubSystem<T>;
     constructor(name: string) {
-        this._name = name;
+        this.name = name;
         this.promise = new Promise((resolve, reject) => {
             this.resolve = resolve;
             this.reject = reject;
@@ -176,29 +197,33 @@ export class Dependency<T extends object> {
         console.log('Created', this.toString());
     }
 
-    dependencies(): Set<Dependency<object>> {
-        return new Set(this.deps);
+    dependencies(): Set<SubSystem<API>> {
+        return new Set(this.data.deps);
     }
 
-    dependents(): Set<Dependency<object>> {
-        const result: Set<Dependency<object>> = new Set();
-        Dependency.systems.forEach((sys) => {
-            if (sys.deps.has(this)) {
+    dependents(): Set<SubSystem<API>> {
+        const result: Set<SubSystem<API>> = new Set();
+        SubSystem.systems.forEach((sys) => {
+            if (sys.data.deps.has(this)) {
                 result.add(sys);
             }
         });
         return result;
     }
 
-    forEach(callback: (value: Dependency<object>) => void): void {
-        this.deps.forEach(callback);
+    forEach(callback: (value: SubSystem<API>) => void): void {
+        this.data.deps.forEach(callback);
     }
     isStarted(): boolean {
-        return this.state === State.STARTED;
+        return this.data?.state === State.STARTED;
     }
 
     status(): string {
-        return `${this.state}`;
+        return `${this.data.state}`;
+    }
+
+    get state() {
+        return this.data?.state ?? this._newData?.state ?? State.NEW;
     }
 
     toString(): string {
@@ -207,7 +232,7 @@ export class Dependency<T extends object> {
 
     static debugAll(): void {
         console.group('Subsystems:');
-        Dependency.systems.forEach((dep) => dep.debug());
+        SubSystem.systems.forEach((dep) => dep.debug());
         console.groupEnd();
     }
 
@@ -215,170 +240,161 @@ export class Dependency<T extends object> {
         console.log(
             this.toString(),
             ':',
-            [...this.deps].map((d) => d.name).join(', '),
+            [...(this.data?.deps ?? this._newData?.deps ?? [])]
+                .map((d) => d.name)
+                .join(', '),
         );
     }
 
-    static get(sysName: string): Dependency<object> {
-        let sys = Dependency.systems.get(sysName);
+    static get<T extends API>(sysName: string): SubSystem<T> {
+        let sys = SubSystem.systems.get(sysName);
         if (!sys) {
-            sys = new Dependency(sysName);
-            if (Dependency.makeProxies)
-                sys.proxy = proxy({}, sys, Dependency.hotReload);
-            Dependency.systems.set(sysName, sys);
+            sys = new SubSystem(sysName);
+            if (SubSystem.makeProxies) sys.proxy = proxy({}, sys);
+            SubSystem.systems.set(sysName, sys);
         }
-        return sys;
+        return sys as SubSystem<T>;
     }
 
-    static getApi<T extends object>(sysName: string): T {
-        const sys = Dependency.get(sysName) as Dependency<T>;
-        return sys._api;
+    static getApi<T extends API>(sysName: string): T {
+        const sys = SubSystem.get(sysName) as SubSystem<T>;
+        return sys.proxy || sys.data.api;
     }
     static setup(
         targetObject: TargetObject,
-        config?: { proxy: boolean; hotReload: boolean; global: boolean },
+        config?: {
+            proxy: boolean | 'always';
+            hotReload: boolean;
+            global: boolean;
+        },
     ) {
         if (config?.global) globalThis.SubSystem = _self;
-        Dependency.targetObject = targetObject;
-        Dependency.makeProxies = !!config?.proxy;
-        Dependency.hotReload = !!config?.hotReload;
-
-        if (targetObject && !targetObject['borb']) {
-            targetObject['borb'] = { subSystem: _self };
+        SubSystem.targetObject = targetObject;
+        SubSystem.makeProxies = !!config?.proxy;
+        SubSystem.alwaysProxy = config?.proxy === 'always';
+        SubSystem.#hotReload = !!config?.hotReload;
+        SubSystem.ready = true;
+        if (targetObject) {
+            set(targetObject, 'borb.systems', _self);
         }
-        let sys = Dependency.queue.shift();
-        console.log(Dependency.queue);
-        while (sys) {
-            console.log(`Registering queued subsystem '${sys.name}'`);
-            Dependency.register(sys);
-            sys = Dependency.queue.shift();
-        }
+        SubSystem.setupResolve(targetObject);
     }
-    static async waitFor<T extends object>(sysName: string): Promise<T> {
-        const dep = Dependency.get(sysName);
+    static async waitFor<T extends API>(
+        sysOrName: string | (T & { _id: string }),
+    ): Promise<T> {
+        const dep = SubSystem.get(
+            typeof sysOrName === 'string' ? sysOrName : sysOrName._id,
+        );
+        console.log('waiting for', dep);
         await dep.promise;
-        return Promise.resolve(dep._api as T);
+        console.log('waited for', dep);
+        return Promise.resolve(dep.api as T);
     }
-    static register(sys: SubSystem<object>) {
-        const depsys = Dependency.get(sys.name);
-        if (Dependency.makeProxies) {
-            depsys.proxy = proxy(
-                sys.prototype ?? {},
-                depsys,
-                Dependency.hotReload,
-            );
-        }
-        if (!Dependency.targetObject) {
-            Dependency.queue.push(sys);
-            console.log(`System not ready, enqueing '${sys.name}'`);
-            return;
-        }
-        if (depsys.state !== State.STOPPED && !sys.reloadable) {
+    static register(name: string, data: SysData<API>) {
+        const sys = SubSystem.get(name);
+        const old = sys.data;
+        if (old && !old.reloadable) {
             throw new Error(`Already registered: ${sys.name}`);
         }
-        depsys.deps.clear();
-        const depends = sys.depends ?? [];
-        for (const d of depends) {
-            depsys.deps.add(Dependency.get(d));
+        data.state = State.WAITING;
+        sys._newData = data;
+        sys.setApi();
+
+        console.log('Registered', sys.toString());
+        const promises = [...data.deps].map((d) => d.promise);
+        return Promise.all([SubSystem.setupPromise, ...promises])
+            .then((res) => sys.init(res))
+            .then(() => queueMicrotask(() => sys.resolve(sys)));
+    }
+    private setApi() {
+        const data = this.data || this._newData;
+        let api = data.api;
+        if (
+            SubSystem.alwaysProxy ||
+            (SubSystem.makeProxies && (!api || !this.data))
+        ) {
+            api = this.proxy = proxy(data.api ?? data.proto ?? {}, this);
+        } else {
+            this.proxy = undefined;
         }
 
-        depsys.state = State.WAITING;
-        depsys.subsystem = sys;
-        depsys.setApi(sys.api);
-        console.log('Registered', depsys.toString());
-        return Promise.all([...depsys.deps].map((d) => d.promise)).then(
-            () => depsys.init(),
-            (reason) => {
-                console.error(
-                    `Dependencies failed for ${depsys.name}: ${reason}`,
-                );
-            },
-        );
-    }
-    private setApi(api: T) {
-        //if(typeof api === "function")
-        //    this._api = api();
-        //else
-        if (!api) api = this.proxy;
-        this._api = api;
-
-        if (this._api) {
-            const names = this.name.split('/');
-            let target = Dependency.targetObject;
-            names.slice(0, -1).forEach((n) => {
-                console.log('find', names, n, target);
-                if (!target[n]) {
-                    target[n] = {};
-                }
-                target = target[n] as TargetObject;
-                console.log('=>', target);
-            });
-            target[names.slice(-1)[0]] = this._api;
-            console.log('=>', target);
+        if (api && SubSystem.targetObject) {
+            set(SubSystem.targetObject, this.name.replace(/\//, '.'), api);
         }
     }
-    async init(): Promise<void> {
-        if (!this.subsystem) return Promise.resolve();
-        if (this.state !== State.STARTED) {
-            const subsystem = this.subsystem;
-            this.state = State.STARTING;
-            console.log('Starting', this.toString());
-            const start = (sys: SubSystem<T>, dep: Dependency<T>) => {
-                console.groupCollapsed(
-                    `Starting ${this.subsystem.name} rev.${this.subsystem.revision}`,
-                );
-                try {
-                    (subsystem.customElements ?? []).forEach((eltDef) => {
-                        try {
-                            console.debug(
-                                'defining custom element %s: %o',
-                                eltDef.tag,
-                                eltDef,
-                            );
-                            customElements.define(eltDef.tag, eltDef);
-                            if (subsystem.revision > 0) {
-                                upgradeElements(eltDef);
-                            }
-                        } catch (e) {
-                            console.error(e);
-                        }
-                    });
-                    return Promise.resolve(this.subsystem.start?.(sys, dep));
-                } finally {
+    async init(res): Promise<this> {
+        console.log('init', this, res);
+        const data = this._newData;
+        const old = this.data;
+        if (old && old.state !== State.STOPPED) {
+            // stop old one
+        }
+        if (data.state !== State.STARTED && data.state !== State.STARTING) {
+            try {
+                this.data = this._newData;
+                delete this._newData;
+                data.state = State.STARTING;
+                if (data.start) {
+                    console.groupCollapsed(
+                        `Starting ${this.name} rev.${data.revision}`,
+                    );
+                    const res = data.start(this);
                     console.groupEnd();
-                }
-            };
-
-            start(this.subsystem, this).then(
-                (obj) => {
-                    console.log('Started', this.toString());
-                    this.state = State.STARTED;
-                    if (obj) this.setApi(obj);
-                    else if (subsystem.prototype)
-                        this.setApi(subsystem.prototype);
-                    this.resolve(subsystem);
-                },
-                (reason) => {
-                    console.error(`While starting ‘${this.name}’:`, reason);
-                    this.state = State.STOPPED;
-                    if (reason instanceof Error) {
-                        reason.message = `In subsystem ‘${this.name}’: ${reason.message}`;
-                        this.reject(reason);
+                    if (isPromise(res)) {
+                        console.log('Waiting for %s startup', this.name);
+                        data.api = await res;
                     } else {
-                        this.reject(
-                            new Error(`In subsystem ‘${this.name}’: ${reason}`),
-                        );
+                        data.api = res;
                     }
-                },
-            );
+                }
+                this.setApi();
+                if (data.customElements && data.customElements.length > 0)
+                    this.defineCustomElements();
+                data.state = State.STARTED;
+                // console.groupEnd();
+                console.log('Started', this.toString());
+                return this;
+            } catch (reason) {
+                // console.groupEnd();
+                console.error(`While starting ‘${this.name}’:`, reason);
+                data.state = State.STOPPED;
+                if (reason instanceof Error) {
+                    reason.message = `In subsystem ‘${this.name}’: ${reason.message}`;
+                    return Promise.reject(reason);
+                } else {
+                    return Promise.reject(
+                        new Error(`In subsystem ‘${this.name}’: ${reason}`),
+                    );
+                }
+            }
         } else {
             console.warn('Already started', this);
-            this.resolve(this.subsystem);
+            return this;
         }
     }
 
-    static declare<T extends object>(
-        nameOrObj: string | (T & { _id: string; _revision?: number }),
+    private defineCustomElements() {
+        console.groupCollapsed(`Defining ${this.name} custom elements`);
+        this.data.customElements.forEach((eltDef) => {
+            try {
+                console.debug(
+                    'defining custom element %s: %o',
+                    eltDef.tag,
+                    eltDef,
+                );
+                customElements.define(eltDef.tag, eltDef);
+                if (this.data.revision > 0) upgradeElements(eltDef);
+            } catch (e) {
+                console.error(e);
+            }
+        });
+        console.groupEnd();
+    }
+
+    static declare<T extends API>(
+        nameOrObj:
+            | string
+            | ((T | (new () => T)) & { _id: string; _revision?: number }),
         prototype?: T,
         revision = 0,
     ): SubSysBuilder<T> {
@@ -394,28 +410,24 @@ export class Dependency<T extends object> {
 }
 
 globalThis.addEventListener?.('DOMContentLoaded', (loadedEvent) => {
-    SubSystem.register({
-        name: 'dom',
-        revision: 0,
-        reloadable: true,
-    });
+    SubSystem.declare('dom').register();
 });
 
 const _self = {
-    debugAll: Dependency.debugAll,
-    register: Dependency.register,
-    get: Dependency.get,
-    getApi: Dependency.getApi,
-    setup: Dependency.setup,
-    waitFor: Dependency.waitFor,
-    declare: Dependency.declare,
+    debugAll: SubSystem.debugAll,
+    register: SubSystem.register,
+    get: SubSystem.get,
+    getApi: SubSystem.getApi,
+    setup: SubSystem.setup,
+    waitFor: SubSystem.waitFor,
+    declare: SubSystem.declare,
     util: {
         interpolate,
     },
     State,
 };
-export const SubSystem = _self;
-export default SubSystem;
+export const Systems = _self;
+export default Systems;
 
 export interface BorbSys {
     subSystem: typeof _self;

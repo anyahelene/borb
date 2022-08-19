@@ -1,4 +1,5 @@
-import SubSystem from './SubSystem';
+import { sysId } from './Common';
+import Systems from './SubSystem';
 
 const subsys_name = 'DragNDrop';
 const revision: number =
@@ -231,7 +232,7 @@ function enterDropTarget(tgt: HTMLElement, ev: DragEvent, oldTgt: HTMLElement) {
     }
 }
 function handlers() {
-    return SubSystem.getApi<typeof _self>(subsys_id).handlers;
+    return Systems.getApi<typeof _self>(subsys_id).handlers;
 }
 const _dragenter = (ev: DragEvent) => handlers().dragenter(ev),
     _dragleave = (ev: DragEvent) => handlers().dragleave(ev),
@@ -381,6 +382,7 @@ function drop(ev: DragEvent) {
 }
 
 const _self = {
+    _id: sysId(import.meta.url),
     DragState,
     dragState,
     attachDraggable,
@@ -392,14 +394,14 @@ const _self = {
 };
 const subsys_id = `borb/${subsys_name.toLowerCase()}`;
 const globalListener = (ev: DragEvent) => ev.preventDefault();
-export const DragNDrop = SubSystem.declare(subsys_id, _self, revision)
+export const DragNDrop = Systems.declare(_self)
     .reloadable(true)
     .depends('dom')
-    .start((self, dep) => {
+    .start(() => {
         document.addEventListener('drop', globalListener);
         document.addEventListener('dragover', globalListener);
 
-        return DragNDrop;
+        return _self;
     })
     .register();
 export default DragNDrop;

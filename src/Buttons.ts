@@ -1,4 +1,4 @@
-import SubSystem from './SubSystem';
+import { Systems } from './SubSystem';
 import { tagName, handleKey, sysId } from './Common';
 import { BorbBaseElement, BorbElement } from './BaseElement';
 import { Hole, html, render } from 'uhtml';
@@ -277,7 +277,7 @@ const _self = {
     keyboardSymbols,
 };
 
-export const Buttons = SubSystem.declare('borb/buttons', _self, revision)
+export const Buttons = Systems.declare(_self)
     .reloadable(false)
     .depends('dom', Styles)
     .elements(BorbButton, BorbCommand)

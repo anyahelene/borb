@@ -1,12 +1,11 @@
-import SubSystem from './SubSystem';
+import Systems from './SubSystem';
 import { sysId, tagName, uniqueId } from './Common';
 import { BorbBaseElement } from './BaseElement';
 import { html, render } from 'uhtml';
 import Styles from './Styles';
-import { HistorySession, History, history } from './History';
 import { Settings } from './Settings';
 import LineEditors, { LineEditor } from './LineEditor';
-import { BorbFrame } from './Frames';
+import { Frames, BorbFrame } from './Frames';
 
 const revision: number =
     import.meta.webpackHot && import.meta.webpackHot.data
@@ -58,6 +57,14 @@ export class BorbTerminal extends BorbBaseElement implements Printer {
     private _lineEditor: LineEditor;
     private _outAnchor: HTMLDivElement;
     private _whenReady: (value: BorbTerminal) => void;
+    private _overlay: HTMLElement;
+    public get overlay(): HTMLElement {
+        return this._overlay;
+    }
+    public set overlay(value: HTMLElement) {
+        this._overlay = value;
+        this.queueUpdate();
+    }
     /** A promise that will be fulfilled when the terminal is display on page */
     whenReady: Promise<BorbTerminal>;
     constructor() {
@@ -143,7 +150,7 @@ export class BorbTerminal extends BorbBaseElement implements Printer {
                 console.log('creating shadow root');
                 this.attachShadow({ mode: 'open' });
             }
-            const settings = SubSystem.getApi<typeof Settings>('borb/settings');
+            const settings = Systems.getApi<typeof Settings>('borb/settings');
             const session = settings.getConfig('session.name', '_');
             const shellName = this.getAttribute('shell') || '';
             const historyId = (session + '/' + shellName).replace(' ', '');
@@ -176,7 +183,7 @@ export class BorbTerminal extends BorbBaseElement implements Printer {
         if (this.isConnected && this.shadowRoot) {
             render(
                 this.shadowRoot,
-                html`${this.styles}
+                html`${this.styles} ${this._overlay || ''}
                     <div class="terminal-out-container" tabindex="-1">
                         ${this._outAnchor} ${this._outElt}
                     </div>
@@ -190,7 +197,11 @@ export class BorbTerminal extends BorbBaseElement implements Printer {
     }
 
     select() {
-        if (this.parentElement && this.parentElement instanceof BorbFrame) {
+        console.log(Frames.BorbFrame);
+        if (
+            this.parentElement &&
+            this.parentElement instanceof Frames.BorbFrame
+        ) {
             this.parentElement.select(this);
         }
     }
@@ -214,13 +225,15 @@ const _self = {
     _id: sysId(import.meta.url),
     _revision: revision,
     BorbTerminal,
+    Frames,
 };
 
-export const Terminals = SubSystem.declare(_self)
+export const Terminals = Systems.declare(_self)
     .reloadable(true)
-    .depends('dom', Styles, Settings, history, LineEditors)
+    .depends('dom', Styles, Settings, LineEditors)
     .elements(BorbTerminal)
     .register();
+console.warn('Terminals', Terminals);
 export default Terminals;
 
 if (import.meta.webpackHot) {

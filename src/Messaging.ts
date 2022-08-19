@@ -1,6 +1,6 @@
 import StackTrace from 'stacktrace-js';
 import { cloneDeepWith, fromPairs, toPairs } from 'lodash-es';
-import SubSystem from './SubSystem';
+import Systems from './SubSystem';
 import { sysId } from './Common';
 import { html, render } from 'uhtml';
 type Router = typeof _self;
@@ -18,7 +18,7 @@ interface LogEntry {
     connection?: Connection;
     timestamp: number;
     error?: Error;
-    handler?: Monitor<Payload> | Method;
+    handler?: Monitor<Payload> | Method<Payload, Payload>;
     status: string;
 }
 export class MessagingError extends Error {
@@ -65,14 +65,12 @@ export interface Header {
 }
 
 export type Payload = Record<string, unknown>;
-export type Method<
-    REQUEST extends Payload = Record<string, unknown>,
-    REPLY extends Payload = Record<string, unknown>,
-> = (msg: REQUEST) => Promise<REPLY>;
-type Transport<
-    REQUEST extends Payload = Record<string, unknown>,
-    REPLY extends Payload = Record<string, unknown>,
-> = (msg: Message) => Promise<Message | void> | void;
+export type Method<REQUEST extends Payload, REPLY extends Payload> = (
+    msg: REQUEST,
+) => Promise<REPLY>;
+type Transport<REQUEST extends Payload, REPLY extends Payload> = (
+    msg: Message,
+) => Promise<Message | void> | void;
 
 type Monitor<T extends Payload> = {
     resolve: (result: T | PromiseLike<T>) => void;
@@ -127,7 +125,10 @@ class MessagingImpl {
             </table>`,
         );
     }
-    public route<T extends Payload>(msgType: string, route: Method<T>) {
+    public route<T extends Payload, R extends Payload>(
+        msgType: string,
+        route: Method<T, R>,
+    ) {
         this.routes.set(msgType, route);
     }
 
@@ -321,7 +322,10 @@ class MessagingImpl {
             },
         };
     }
-    public reply(msg: Message, content: Payload): Message {
+    public reply(
+        msg: Message,
+        content: Payload & { status?: string },
+    ): Message {
         if (!content) content = { status: 'ok' };
         if (!content.status) content.status = 'ok';
         return {
@@ -427,7 +431,7 @@ export function createMessaging() {
     return new MessagingImpl();
 }
 
-export const Messaging = SubSystem.declare(_self)
+export const Messaging = Systems.declare(_self)
     .reloadable(false)
     .depends()
     .register();

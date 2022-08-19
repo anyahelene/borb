@@ -1,4 +1,4 @@
-import { SubSystem } from './SubSystem';
+import Systems from './SubSystem';
 import { html, render } from 'uhtml';
 import { tagName, assert, uniqueId, sysId, interpolate } from './Common';
 import { BorbBaseElement, BorbElement } from './BaseElement';
@@ -176,7 +176,9 @@ class TabEntry extends HTMLButtonElement {
 
     select() {
         console.warn('select', this);
+        const old = this.frame.selected;
         this.frame.selected = this;
+        if (old !== this) this.frame.tabTransition();
         this.frame.queueUpdate();
         queueMicrotask(() => {
             // this.frame._focusin(undefined);
@@ -218,6 +220,7 @@ export class BorbFrame extends BorbBaseElement {
     // private _style: HTMLStyleElement;
     // private _styleChangedHandler = (ev: Event) => this.styleChanged();
     private _header: HTMLElement;
+    private _overlay: HTMLElement;
     constructor() {
         super(['css/common.css', styleRef]);
         // this._style = Styles.get(styleRef);
@@ -227,6 +230,15 @@ export class BorbFrame extends BorbBaseElement {
         const minIcon = '🗕';
         this._header = html.node`<header>${this._nav}<h1 draggable="true"></h1>
             <nav class="window-tools"><button class="min-button">${minIcon}</button><button class="max-button">${maxIcon}</button></nav></header>`;
+        this._overlay = document.createElement('div');
+        this._overlay.classList.add('overlay');
+        this._overlay.style.position = 'absolute';
+        this._overlay.style.opacity = '0%';
+        this._overlay.style.left = '.25rem';
+        this._overlay.style.top = '1.25rem';
+        this._overlay.style.zIndex = '99';
+        this._overlay.style.transform = 'scale(-8,8) translate(-50%,50%)';
+        this._overlay.style.textShadow = '#fff 0px 0px 1px, #fff 0px 0px 5px';
         this._header.dataset.drop = 'true';
         this._header.addEventListener('borbdragenter', (ev: BorbDragEvent) => {
             if (
@@ -339,7 +351,7 @@ export class BorbFrame extends BorbBaseElement {
                     ? html`<slot></slot>`
                     : html`<slot name=${this.selected?.panel.slot || '<none>'}
                           ><div class="empty-slot"></div
-                      ></slot>`}`,
+                      ></slot>`}${this._overlay}`,
             );
         } catch (ex) {
             console.error('Frame.update', this, ex);
@@ -384,6 +396,7 @@ export class BorbFrame extends BorbBaseElement {
         const tab = this._tabs.get(elt);
         if (tab) {
             tab.select();
+            this.tabTransition();
         } else {
             console.error(
                 'BorbFrame.select: no tab found for ',
@@ -399,6 +412,7 @@ export class BorbFrame extends BorbBaseElement {
     updateChildren() {
         this._structureChanged = false;
         let selected: TabEntry = undefined;
+        const lastSelected = this.selected;
         const removedChildren = new Set(this._tabs.keys());
         const before = [...this._nav.children];
         console.log('updateChildren', this.frameName, 'before', before);
@@ -418,6 +432,7 @@ export class BorbFrame extends BorbBaseElement {
         removedChildren.forEach((elt) => this.delTab(elt));
         if (selected) this.selected = selected;
         else this.selected = this._nav.children?.[0] as TabEntry;
+        if (this.selected !== lastSelected) this.tabTransition();
         return !isEqual(before, after);
     }
 
@@ -484,7 +499,24 @@ export class BorbFrame extends BorbBaseElement {
     //     this.update();
     //     console.log('style changed', this, styleRef, this._style);
     // }
-
+    tabTransition() {
+        const icon = this.selected?.titleAttrs['icon'];
+        if (icon) {
+            this._overlay.innerText = icon;
+            //this._overlay.innerHTML = `<svg viewBox="-16 -16 32 32" preserveAspectRatio="xMidYMid meet"><text font-size="16px" text-anchor="middle" dominant-baseline="middle"  >${icon}</text></svg>`;
+            this._overlay.animate(
+                [
+                    { opacity: '0%' },
+                    {
+                        opacity: '50%',
+                        offset: 0.5,
+                    },
+                    { opacity: '10%' },
+                ],
+                { duration: 1000, iterations: 1 },
+            );
+        }
+    }
     _focusin(ev: FocusEvent) {
         this.classList.add('focused', 'focusin');
         const last = BorbFrame.currentFocus;
@@ -510,21 +542,30 @@ export class BorbPanelBuilder<T extends HTMLElement = HTMLElement> {
     private _id: string;
     private _strict: boolean;
     private _error: string[] = [];
+    private _select: boolean;
     frame(targetFrame: BorbFrame | string): this {
         let fr =
             typeof targetFrame === 'string'
                 ? document.getElementById(targetFrame)
                 : targetFrame;
-        if (!(fr instanceof BorbFrame)) {
+        if (!fr.tagName.startsWith('BORB-FRAME')) {
             const err = `Can't find frame, or not a BorbFrame: ${targetFrame}`;
             this._error.push(err);
             console.error(err, this, fr);
         } else {
-            this._frame = fr;
+            this._frame = fr as BorbFrame;
         }
         return this;
     }
 
+    select(): this {
+        this._select = true;
+        return this;
+    }
+    title(title: string): this {
+        this._title = title;
+        return this;
+    }
     panel<U extends HTMLElement = T>(panel: string): BorbPanelBuilder<U>;
     panel<U extends HTMLElement>(panel: U): BorbPanelBuilder<U>;
     panel<U extends HTMLElement>(
@@ -554,7 +595,10 @@ export class BorbPanelBuilder<T extends HTMLElement = HTMLElement> {
         if (!this._panel) this._panel = document.createElement('section') as T;
         if (this._title) this._panel.setAttribute('tab-title', this._title);
         if (this._id) this._panel.id = this._id;
-        if (this._frame) this._frame.appendChild(this._panel);
+        if (this._frame) {
+            this._frame.appendChild(this._panel);
+            if (this._select) this._frame.select(this._panel);
+        }
 
         return this._panel;
     }
@@ -567,14 +611,12 @@ const _self = {
     BorbTab,
     BorbPanel,
     styleRef,
-    version: 9,
-    revision,
 };
-export const Frames = SubSystem.declare(_self)
+export const Frames = Systems.declare(_self)
     .reloadable(true)
     .depends('dom', Styles)
     .elements(BorbFrame, BorbTab, BorbPanel)
-    .start((self, dep) => {
+    .start((sys) => {
         customElements.define(TabEntry.tag, TabEntry, { extends: 'button' });
         return _self;
     })

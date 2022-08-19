@@ -1,7 +1,7 @@
 //import {EditorState} from "@codemirror/state"
 //import {EditorView, keymap} from "@codemirror/view"
 //import {defaultKeymap} from "@codemirror/commands"
-import { SubSystem } from './SubSystem';
+import Systems from './SubSystem';
 
 import {
     EditorView,
@@ -584,7 +584,7 @@ const _self = {
     TDEditor,
 };
 
-export const Editor = SubSystem.declare(_self)
+export const Editor = Systems.declare(_self)
     .reloadable(true)
     .depends('dom')
     //    .elements(BorbTerminal)

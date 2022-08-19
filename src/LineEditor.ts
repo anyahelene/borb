@@ -25,7 +25,7 @@ import Editor, {
     stdConfig,
     TDEditor,
 } from './Editor';
-import { HistorySession, history, History, Entry } from './History';
+import { LineHistory, HistorySession, Entry } from './LineHistory';
 import Settings from './Settings';
 import SubSystem from './SubSystem';
 import type { BorbTerminal } from './Terminal';
@@ -117,12 +117,10 @@ export class LineEditor {
                     this.terminal.shadowRoot,
                 );
             }),
-            SubSystem.getApi<History>(history._id)
-                .forSession(historyId)
-                .then((hist) => {
-                    console.log('history ready');
-                    this.history = hist;
-                }),
+            LineHistory.forSession(historyId).then((hist) => {
+                console.log('history ready');
+                this.history = hist;
+            }),
         ]).then(() => {
             this.terminal.status = 'ready';
         });
@@ -142,7 +140,11 @@ export class LineEditor {
                     .then((res) => {
                         if (res && res.more) {
                             this.history.edit(res.more);
-                            replaceDoc(state, dispatch, res.more);
+                            replaceDoc(
+                                this.editor.state(),
+                                this.editor.view.dispatch,
+                                res.more,
+                            );
                         }
                         if (this.afterEnter) this.afterEnter(line, this);
                         return res;
@@ -354,7 +356,7 @@ const _self = {
 
 export const LineEditors = SubSystem.declare(_self)
     .reloadable(true)
-    .depends('dom', history, Editor)
+    .depends('dom', LineHistory, Editor)
     .elements()
     .register();
 export default LineEditors;

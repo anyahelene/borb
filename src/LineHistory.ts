@@ -1,7 +1,8 @@
+import { Line } from '@codemirror/state';
 import Dexie from 'dexie';
 import { PromiseExtended } from 'dexie';
 import { sysId } from './Common';
-import { SubSystem } from './SubSystem';
+import Systems from './SubSystem';
 const id = sysId(import.meta.url);
 const revision: number =
     import.meta.webpackHot && import.meta.webpackHot.data
@@ -118,7 +119,7 @@ export interface HistorySession {
     list(): Promise<Entry[]>;
 }
 
-export interface History {
+export interface HistoryManager {
     _id: string;
     _revision: number;
     forSession(session: string, persistent?: boolean): Promise<HistorySession>;
@@ -230,10 +231,10 @@ class DBHistorySession implements HistorySession {
         return this.go(next ?? this.newEntry);
     }
     async list(): Promise<Entry[]> {
-        return await history.list(this.session);
+        return await DBHistory.list(this.session);
     }
 }
-const DBHistory: History = {
+const DBHistory: HistoryManager = {
     _id: id,
     _revision: revision,
     async forSession(
@@ -373,7 +374,7 @@ class FakeHistorySession implements HistorySession {
 
 const fakeHistorySessions = {};
 const fakeHistoryEntries: { [sessionName: string]: Entry[] } = {};
-const FakeHistory: History = {
+const FakeHistory: HistoryManager = {
     _id: id,
     _revision: revision,
     async forSession(session: string): Promise<HistorySession> {
@@ -434,38 +435,38 @@ const _self_proto = {
     _id: id,
     _revision: revision,
     forSession(session: string): Promise<HistorySession> {
-        return SubSystem.waitFor<History>(_self_proto._id).then((h) =>
+        return Systems.waitFor<HistoryManager>(_self_proto._id).then((h) =>
             h.forSession(session),
         );
     },
     get(session: string, id?: number): Promise<Entry> {
-        return SubSystem.waitFor<History>(_self_proto._id).then((h) =>
+        return Systems.waitFor<HistoryManager>(_self_proto._id).then((h) =>
             h.get(session, id),
         );
     },
     put(session: string, data: string, id?: number): Promise<number> {
-        return SubSystem.waitFor<History>(_self_proto._id).then((h) =>
+        return Systems.waitFor<HistoryManager>(_self_proto._id).then((h) =>
             h.put(session, data, id),
         );
     },
     list(session: string): Promise<Entry[]> {
-        return SubSystem.waitFor<History>(_self_proto._id).then((h) =>
+        return Systems.waitFor<HistoryManager>(_self_proto._id).then((h) =>
             h.list(session),
         );
     },
-    sessions(sortBy: string): Promise<Session[]> {
-        return SubSystem.waitFor<History>(_self_proto._id).then((h) =>
+    sessions(sortBy?: string): Promise<Session[]> {
+        return Systems.waitFor<HistoryManager>(_self_proto._id).then((h) =>
             h.sessions(sortBy),
         );
     },
     currentId(session: string): Promise<number> {
-        return SubSystem.waitFor<History>(_self_proto._id).then((h) =>
+        return Systems.waitFor<HistoryManager>(_self_proto._id).then((h) =>
             h.currentId(session),
         );
     },
 };
 
-export let history: History = SubSystem.declare(_self_proto)
+export const LineHistory: HistoryManager = Systems.declare(_self_proto)
     .reloadable(true)
     .depends()
     .elements()
@@ -474,15 +475,14 @@ export let history: History = SubSystem.declare(_self_proto)
             const dbobj = await new HistoryDexie().open();
             db = dbobj;
             console.log('history db open', db);
-            history = DBHistory;
+            return DBHistory;
         } catch (err) {
             console.warn('HistoryDB open failed', err);
-            history = FakeHistory;
+            return FakeHistory;
         }
-        return history;
     })
     .register();
-export default history;
+export default LineHistory;
 
 if (import.meta.webpackHot) {
     import.meta.webpackHot.decline();
