@@ -8,6 +8,8 @@ export { default as DragNDrop } from './DragNDrop';
 export { default as SubSystem } from './SubSystem';
 export { default as Settings } from './Settings';
 export { default as History } from './LineHistory';
+export { default as LineEditors } from './LineEditor';
+export { default as Editors } from './Editor';
 export { Messaging } from './Messaging';
 export { MDRender } from './MDRender';
 export * as MarkdownEngine from './remarkable';

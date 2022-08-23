@@ -74,18 +74,20 @@ export function getStyleFor(
         clone = get(name, defaultStyles);
         clones.set(elt, clone);
     }
-    console.log('getting style %s for %o: %o', name, elt, clone);
+    if (_self._debug)
+        console.log('getting style %s for %o: %o', name, elt, clone);
     return clone;
 }
 export function disposeStyle(elt: HTMLElement, name: string): HTMLStyleElement {
     const clones = data.styleClones.get(name);
     if (clones) {
-        console.log(
-            'disposing of style %s for %o: %o',
-            name,
-            elt,
-            clones.get(elt),
-        );
+        if (_self._debug)
+            console.log(
+                'disposing of style %s for %o: %o',
+                name,
+                elt,
+                clones.get(elt),
+            );
         clones.delete(elt);
         if (clones.size === 0) {
             data.styleClones.delete(name);
@@ -98,12 +100,13 @@ export function refreshClones(name: string, node: HTMLStyleElement) {
     const clones = data.styleClones.get(name);
     if (clones) {
         clones.forEach((clone, elt) => {
-            console.log(
-                'updating style %s for %o, style element %o',
-                name,
-                elt,
-                clone,
-            );
+            if (_self._debug)
+                console.log(
+                    'updating style %s for %o, style element %o',
+                    name,
+                    elt,
+                    clone,
+                );
             clone.textContent = node.textContent;
         });
     }
@@ -183,12 +186,13 @@ export function load(
  * @returns The associated STYLE element
  */
 export function update(name: string): void {
-    console.log('updating stylesheet', name);
+    if (_self._debug) console.log('updating stylesheet', name);
     load(name, true);
 }
 const _self = {
     _id: sysId(import.meta.url),
     _revision: revision,
+    _debug: false,
     get,
     getStyleFor,
     disposeStyle,

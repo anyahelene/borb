@@ -1,4 +1,4 @@
-import { previousTagName } from './Common';
+import { isFrame, previousTagName, tagName } from './Common';
 import Styles from './Styles';
 
 export class BorbElement extends HTMLElement {
@@ -8,6 +8,9 @@ export class BorbElement extends HTMLElement {
     }
 }
 
+export interface BorbContainer extends BorbElement {
+    select(elementOrName: string | HTMLElement): boolean;
+}
 export abstract class BorbBaseElement extends BorbElement {
     static tag: string;
     styles: HTMLStyleElement[];
@@ -20,18 +23,20 @@ export abstract class BorbBaseElement extends BorbElement {
 
     connectedCallback() {
         if (this.isConnected) {
-            this.styles = this.stylesUrls.map((styleRef) =>
-                Styles.getStyleFor(this, styleRef),
-            );
+            this.styles = this.stylesUrls.map((styleRef) => Styles.getStyleFor(this, styleRef));
             this.queueUpdate();
         }
     }
     disconnectedCallback() {
-        this.styles = this.stylesUrls.map((styleRef) =>
-            Styles.disposeStyle(this, styleRef),
-        );
+        this.styles = this.stylesUrls.map((styleRef) => Styles.disposeStyle(this, styleRef));
     }
-
+    select(): boolean {
+        if (isFrame(this.parentElement)) {
+            return this.parentElement.select(this);
+        } else {
+            return false;
+        }
+    }
     queueUpdate(structureChanged = false) {
         this._structureChanged ||= structureChanged;
         if (!this._doUpdate) {
@@ -45,5 +50,5 @@ export abstract class BorbBaseElement extends BorbElement {
         }
     }
 
-    abstract update(structureChanged: boolean): void | Promise<void>;
+    protected abstract update(structureChanged: boolean): void | Promise<void>;
 }

@@ -195,17 +195,11 @@ export class BorbTerminal extends BorbBaseElement implements Printer {
             }
         }
     }
-
-    select() {
-        console.log(Frames.BorbFrame);
-        if (
-            this.parentElement &&
-            this.parentElement instanceof Frames.BorbFrame
-        ) {
-            this.parentElement.select(this);
-        }
+    focus(options?: FocusOptions) {
+        super.focus(options);
+        if (this._lineEditor) this._lineEditor.focus();
+        console.log('terminal focus', this);
     }
-
     ensureId() {
         if (!this.id) uniqueId('terminal', this);
         return this.id;

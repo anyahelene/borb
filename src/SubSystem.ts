@@ -290,6 +290,18 @@ export class SubSystem<T extends API> {
         console.log('waited for', dep);
         return Promise.resolve(dep.api as T);
     }
+    static async waitForAll(
+        ...sysOrNames: (string | { _id: string })[]
+    ): Promise<void> {
+        const deps = sysOrNames.map((sysOrName) =>
+            SubSystem.get(
+                typeof sysOrName === 'string' ? sysOrName : sysOrName._id,
+            ),
+        );
+        console.log('waiting for', deps);
+        await Promise.all(deps.map((d) => d.promise));
+        console.log('waited for', deps);
+    }
     static register(name: string, data: SysData<API>) {
         const sys = SubSystem.get(name);
         const old = sys.data;
@@ -420,6 +432,7 @@ const _self = {
     getApi: SubSystem.getApi,
     setup: SubSystem.setup,
     waitFor: SubSystem.waitFor,
+    waitForAll: SubSystem.waitForAll,
     declare: SubSystem.declare,
     util: {
         interpolate,

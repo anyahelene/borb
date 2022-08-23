@@ -21,10 +21,12 @@ import { html } from 'uhtml';
 import { sysId } from './Common';
 import Editor, {
     fontConfig,
-    isBetweenBrackets,
+    replaceDoc,
     stdConfig,
-    TDEditor,
-} from './Editor';
+    highlightTree,
+    paste,
+} from './CodeMirror';
+import { NodeProp } from '@lezer/common';
 import { LineHistory, HistorySession, Entry } from './LineHistory';
 import Settings from './Settings';
 import SubSystem from './SubSystem';
@@ -72,7 +74,6 @@ const historyKeys = {
     pageDown: 'last',
 };
 export class LineEditor {
-    public editor: TDEditor;
     public history: HistorySession;
     public terminal: BorbTerminal;
     histCommands: { [key: string]: () => Promise<Entry> };
@@ -85,8 +86,9 @@ export class LineEditor {
         outputElement: HTMLElement,
         lineEditor: this,
     ) => Promise<Prompt>;
+    private _view: EditorView;
     focus(): void {
-        this.editor.focus();
+        if (this._view) this._view.focus();
     }
 
     constructor(term: BorbTerminal, lang?: Language) {
@@ -108,7 +110,7 @@ export class LineEditor {
             this.terminal.whenReady.then(() => {
                 console.log('terminal ready');
                 this.terminal.lineEditor = this;
-                this.editor = createLineEditor(
+                this._view = createLineEditor(
                     this.terminal.inputElement,
                     '',
                     lang?.editMode || 'plain',
@@ -141,8 +143,8 @@ export class LineEditor {
                         if (res && res.more) {
                             this.history.edit(res.more);
                             replaceDoc(
-                                this.editor.state(),
-                                this.editor.view.dispatch,
+                                this._view.state,
+                                this._view.dispatch,
                                 res.more,
                             );
                         }
@@ -177,7 +179,8 @@ export class LineEditor {
         this.terminal.status = 'running';
         const line = state.sliceDoc();
         const id = this.history ? await this.history.enter(line) : this._seq++;
-        const elt = this.editor.highlightTree(
+        const elt = highlightTree(
+            this._view.state,
             html.node`<span class="prompt" data-user="">[${id}]</span>`,
         );
         elt.classList.add('block');
@@ -188,33 +191,38 @@ export class LineEditor {
             return ret;
         }
     }
+    paste(text: string) {
+        paste(this._view, text);
+        this.terminal.inputElement.scrollIntoView({
+            block: 'end',
+            inline: 'nearest',
+        });
+    }
     disableHistory(): void {
         //
     }
 }
 
-function replaceDoc(
-    state: EditorState,
-    dispatch: (tr: Transaction) => void,
-    data: string,
-    cursor = 0,
-) {
-    const text = state.toText(data);
-    const len = text.length;
-    if (cursor < 0) cursor = cursor + 1 + len;
-    cursor = Math.max(0, Math.min(len, cursor));
-    dispatch(
-        state.update({
-            changes: {
-                from: 0,
-                to: state.doc.length,
-                insert: text,
-            },
-            selection: EditorSelection.cursor(cursor),
-            scrollIntoView: true,
-        }),
-    );
+function isBetweenBrackets(state: EditorState, pos: number) {
+    if (/\(\)|\[\]|\{\}/.test(state.sliceDoc(pos - 1, pos + 1)))
+        return { from: pos, to: pos };
+    const context = syntaxTree(state).resolve(pos);
+    const before = context.childBefore(pos),
+        after = context.childAfter(pos);
+    let closedBy: string | readonly string[];
+    if (
+        before &&
+        after &&
+        before.to <= pos &&
+        after.from >= pos &&
+        (closedBy = before.type.prop(NodeProp.closedBy)) &&
+        closedBy.indexOf(after.name) > -1 &&
+        state.doc.lineAt(before.to).from == state.doc.lineAt(after.from).from
+    )
+        return { from: before.to, to: after.from };
+    return null;
 }
+
 export const createLineEditor = function (
     elt: HTMLElement,
     text: string,
@@ -314,13 +322,13 @@ export const createLineEditor = function (
         return handler('arrowDown', state, dispatch);
     };
 
-    const editor = new TDEditor(
-        outer.id,
-        outer,
-        elt,
-        text,
-        lang,
-        [
+    const state = EditorState.create({
+        doc: '',
+        extensions: [
+            keymap.of([
+                { key: 'Enter', run: enter, shift: shiftEnter },
+                { key: 'Tab', run: tab, shift: indentLess },
+            ]),
             fontConfig(elt),
             stdConfig(),
             EditorView.theme({
@@ -333,19 +341,17 @@ export const createLineEditor = function (
                 { key: 'ArrowDown', run: arrowDown },
             ]),
         ],
-        [
-            keymap.of([
-                { key: 'Enter', run: enter, shift: shiftEnter },
-                { key: 'Tab', run: tab, shift: indentLess },
-            ]),
-        ],
+    });
+    const view = new EditorView({
+        state,
+        parent: elt,
         root,
-    );
+    });
 
-    editor._after_paste = () => {
-        outer.scrollIntoView({ block: 'end', inline: 'nearest' });
-    };
-    return editor;
+    // editor._after_paste = () => {
+    //     outer.scrollIntoView({ block: 'end', inline: 'nearest' });
+    // };
+    return view;
 };
 
 const _self = {

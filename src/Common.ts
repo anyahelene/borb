@@ -1,4 +1,5 @@
-import type { BorbElement } from './BaseElement';
+import { Borb } from '.';
+import type { BorbContainer, BorbElement } from './BaseElement';
 
 export const borbName = 'borb';
 
@@ -48,6 +49,10 @@ export function assert<T>(
     return cond;
 }
 
+const frameTag = tagName('frame').toUpperCase();
+export function isFrame(elt: HTMLElement | BorbContainer): elt is BorbContainer {
+    return elt && elt.tagName.startsWith(frameTag);
+}
 let unique = 0;
 
 /**
@@ -57,10 +62,7 @@ let unique = 0;
  */
 export function uniqueId(...strOrElts: (Element | string)[]): string {
     let prefix = '_';
-    if (
-        typeof strOrElts[0] === 'string' &&
-        typeof strOrElts[1] in ['undefined', 'string']
-    ) {
+    if (typeof strOrElts[0] === 'string' && typeof strOrElts[1] in ['undefined', 'string']) {
         prefix = strOrElts.shift() as string;
     }
     let suffix = '_';
@@ -74,26 +76,15 @@ export function uniqueId(...strOrElts: (Element | string)[]): string {
     return `${prefix}${suffix}${unique++}`;
 }
 
-let keyhandler: (
-    key: string,
-    button?: HTMLElement,
-    event?: Event,
-) => Promise<unknown> = (key) => Promise.resolve();
+let keyhandler: (key: string, button?: HTMLElement, event?: Event) => Promise<unknown> = (key) =>
+    Promise.resolve();
 export function setKeyHandler(
-    handler: (
-        key: string,
-        button?: HTMLElement,
-        event?: Event,
-    ) => Promise<unknown>,
+    handler: (key: string, button?: HTMLElement, event?: Event) => Promise<unknown>,
 ) {
     keyhandler = handler;
 }
 
-export function handleKey(
-    key: string,
-    button?: HTMLElement,
-    event?: Event,
-): Promise<unknown> {
+export function handleKey(key: string, button?: HTMLElement, event?: Event): Promise<unknown> {
     return keyhandler(key, button, event);
 }
 
@@ -118,9 +109,7 @@ export function interpolate(s: string, data: { [attr: string]: string }) {
     const props = new Set<string>(Object.keys(data));
     let result = '';
     for (;;) {
-        const m = s.match(
-            /^(.*?)\${(?:{(.*?)})?([a-z0-9-]*)(?:{(.*?)})?}(.*)$/,
-        );
+        const m = s.match(/^(.*?)\${(?:{(.*?)})?([a-z0-9-]*)(?:{(.*?)})?}(.*)$/);
 
         if (m) {
             result = result + m[1];
@@ -139,4 +128,10 @@ export function interpolate(s: string, data: { [attr: string]: string }) {
 
 export function isPromise(obj: any | Promise<any>): obj is Promise<any> {
     return typeof obj?.['then'] === 'function';
+}
+
+export class Cancelled extends Error {
+    constructor(message: string) {
+        super(message);
+    }
 }

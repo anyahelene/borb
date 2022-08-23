@@ -78,7 +78,7 @@ class DragState {
             this.dragSource.style.left = '';
             this.dragSource.style.top = '';
             this.offsets.dragging = false;
-            console.log('pauseDrag', this.offsets);
+            if (_self._debug) console.log('pauseDrag', this.offsets);
         }
     }
     resumeDrag(dropTarget: HTMLElement, ev: DragEvent) {
@@ -91,7 +91,7 @@ class DragState {
             // this.offsets.startX = ev.pageX;
             // this.offsets.startY = ev.pageY;
             this.offsets.dragging = true;
-            console.log('resumeDrag', this.offsets);
+            if (_self._debug) console.log('resumeDrag', this.offsets);
         }
     }
     updateDrag(ev: DragEvent) {
@@ -172,7 +172,7 @@ function targetElement(tgt: EventTarget): HTMLElement {
 function dropTarget(elt: HTMLElement, zoneSpec: DropZone): HTMLElement {
     const query = zoneSpec?.query ?? '[data-drop]';
     elt = elt.closest(query);
-    console.log('dropTarget', query, elt);
+    if (_self._debug) console.log('dropTarget', query, elt);
     // if (elt && dragState.offsets && elt === dragState.dragSource) {
     //     elt = elt.parentElement.closest('[data-drop="true"]');
     // }
@@ -183,15 +183,22 @@ function leaveDropTarget(ev: DragEvent, newTgt?: HTMLElement) {
     const tgt = dragState.dropTarget;
     if (dragState.dropTarget) {
         if (newTgt)
-            console.log(
-                'DragNDrop LEAVE',
-                ev.type,
-                dragState.dropTarget,
-                'TO',
-                newTgt,
-                ev,
-            );
-        else console.log('DragNDrop LEAVE', ev.type, dragState.dropTarget, ev);
+            if (_self._debug)
+                console.log(
+                    'DragNDrop LEAVE',
+                    ev.type,
+                    dragState.dropTarget,
+                    'TO',
+                    newTgt,
+                    ev,
+                );
+            else if (_self._debug)
+                console.log(
+                    'DragNDrop LEAVE',
+                    ev.type,
+                    dragState.dropTarget,
+                    ev,
+                );
         dragState.dropTarget.removeAttribute('borb-drop');
         const bev = new BorbDragEvent(`borb${ev.type}`, ev);
         bev.newTarget = newTgt;
@@ -212,16 +219,24 @@ function enterDropTarget(tgt: HTMLElement, ev: DragEvent, oldTgt: HTMLElement) {
         dragState.dropTarget = tgt;
         dragState.dropAllowed = 'none';
         if (oldTgt)
-            console.log(
-                'DragNDrop ENTER',
-                ev.type,
-                dragState.count,
-                tgt,
-                'FROM',
-                oldTgt,
-                ev,
-            );
-        else console.log('DragNDrop ENTER', ev.type, dragState.count, tgt, ev);
+            if (_self._debug)
+                console.log(
+                    'DragNDrop ENTER',
+                    ev.type,
+                    dragState.count,
+                    tgt,
+                    'FROM',
+                    oldTgt,
+                    ev,
+                );
+            else if (_self._debug)
+                console.log(
+                    'DragNDrop ENTER',
+                    ev.type,
+                    dragState.count,
+                    tgt,
+                    ev,
+                );
         const bev = new BorbDragEvent('borbdragenter', ev);
         bev.oldTarget = oldTgt;
         dragState.dropTarget.dispatchEvent(bev);
@@ -260,7 +275,7 @@ export function attachDraggable(elt: HTMLElement) {
     elt.addEventListener('dragstart', _dragstart);
     elt.addEventListener('dragend', _dragend);
     elt.draggable = true;
-    console.log('DRAG ON', elt);
+    if (_self._debug) console.log('DRAG ON', elt);
 }
 export function detachDraggable(elt: HTMLElement) {
     elt.removeEventListener('dragstart', _dragstart);
@@ -278,7 +293,8 @@ function dragstart(ev: DragEvent) {
         dragState.reset();
     }
     if (ev.currentTarget instanceof HTMLElement) {
-        console.log('DragNDrop start', ev.currentTarget, ev, dragState);
+        if (_self._debug)
+            console.log('DragNDrop start', ev.currentTarget, ev, dragState);
         const elt = ev.currentTarget;
         dragState.startDrag(ev, elt, elt.dataset.dragStyle);
         ev.dataTransfer.setData('application/x-borb-dragging', elt.id);
@@ -294,7 +310,8 @@ function dragstart(ev: DragEvent) {
 }
 
 function dragend(ev: DragEvent) {
-    console.log('DragNDrop end', ev.currentTarget, ev, dragState);
+    if (_self._debug)
+        console.log('DragNDrop end', ev.currentTarget, ev, dragState);
     dragState.dragSource.removeAttribute('borb-dragging');
     leaveDropTarget(ev);
     dragState.reset();
@@ -311,7 +328,8 @@ function dragenter(ev: DragEvent) {
     }
     if (dragState.dropTarget === drop) {
         dragState.count++;
-        console.log('DragNDrop enter', dragState.count, drop, ev, target);
+        if (_self._debug)
+            console.log('DragNDrop enter', dragState.count, drop, ev, target);
     } else {
         enterDropTarget(drop, ev, leaveDropTarget(ev, drop));
         dragState.pauseDrag(drop, ev);
@@ -324,18 +342,19 @@ function dragleave(ev: DragEvent) {
         dropZones.get(ev.currentTarget as HTMLElement),
     );
     if (!drop || drop !== dragState.dropTarget) {
-        console.log(
-            'ignored   dragleave',
-            dragState.count,
-            drop,
-            '!==',
-            dragState.dropTarget,
-            ev,
-            target,
-        );
+        if (_self._debug)
+            console.log(
+                'ignored   dragleave',
+                dragState.count,
+                drop,
+                '!==',
+                dragState.dropTarget,
+                ev,
+                target,
+            );
         return;
     } else if (--dragState.count > 0) {
-        console.log('DragNDrop leave', drop, ev, target);
+        if (_self._debug) console.log('DragNDrop leave', drop, ev, target);
     } else {
         leaveDropTarget(ev);
         dragState.resumeDrag(drop, ev);
@@ -345,7 +364,7 @@ function dragover(ev: DragEvent) {
     if (dragState.dropAllowed !== 'none') {
         ev.preventDefault();
         ev.dataTransfer.dropEffect = dragState.dropAllowed;
-        // console.log('dragover', dragState.count, dragState.dropTarget, ev);
+        // if(_self._debug) console.log('dragover', dragState.count, dragState.dropTarget, ev);
     } else {
         ev.preventDefault();
     }
@@ -356,19 +375,20 @@ function drop(ev: DragEvent) {
         return;
     }
     if (dragState.dragSource)
-        console.log(
-            'DragNDrop DROP ELEMENT',
-            dragState.dragSource,
-            dragState.dropTarget,
-            ev,
-        );
-    else
-        console.log(
-            'DragNDrop DROP DATA   ',
-            ev.dataTransfer,
-            dragState.dropTarget,
-            ev,
-        );
+        if (_self._debug)
+            console.log(
+                'DragNDrop DROP ELEMENT',
+                dragState.dragSource,
+                dragState.dropTarget,
+                ev,
+            );
+        else if (_self._debug)
+            console.log(
+                'DragNDrop DROP DATA   ',
+                ev.dataTransfer,
+                dragState.dropTarget,
+                ev,
+            );
     leaveDropTarget(ev, dragState.dropTarget);
     ev.preventDefault();
     const bev = new BorbDragEvent('borbdrop', ev);
@@ -383,6 +403,7 @@ function drop(ev: DragEvent) {
 
 const _self = {
     _id: sysId(import.meta.url),
+    _debug: false,
     DragState,
     dragState,
     attachDraggable,

@@ -196,7 +196,7 @@ export class BorbButton extends BorbBaseElement {
     async run(e: Event) {
         const cmd = this.command;
         if (cmd) {
-            // console.log("Run command", cmd, "button", this, "event", e);
+            //  if(_self._debug) console.log("Run command", cmd, "button", this, "event", e);
             if (cmd.element) {
                 await cmd.element.run(this, e);
             } else {
@@ -219,7 +219,13 @@ export class BorbButton extends BorbBaseElement {
     }
 
     attributeChangedCallback(name: string, oldValue: string, newValue: string) {
-        console.log('element attributes changed.', name, oldValue, newValue);
+        if (_self._debug)
+            console.log(
+                'element attributes changed.',
+                name,
+                oldValue,
+                newValue,
+            );
         this.update();
     }
 
@@ -248,7 +254,7 @@ export class BorbButton extends BorbBaseElement {
         if (shortcut && shortcut !== '(not implemented)')
             Mousetrap.bindGlobal(shortcut, this.clickHandler);
 
-        //console.log(this.id, command, icon, shortcut, shortcutText, keys);
+        // if(_self._debug)  console.log(this.id, command, icon, shortcut, shortcutText, keys);
         return html`${this.styles}
             <button
                 id="${this.id}"
@@ -270,6 +276,7 @@ export class BorbButton extends BorbBaseElement {
 const _self = {
     _id: sysId(import.meta.url),
     _revision: revision,
+    _debug: false,
     BorbButton,
     BorbCommand,
     commands,

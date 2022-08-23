@@ -35,9 +35,7 @@ export class BorbDocument extends BorbBaseElement {
 
     get src(): URL {
         const src = this.getAttribute('src');
-        return src
-            ? new URL(this.getAttribute('src'), document.URL)
-            : undefined;
+        return src ? new URL(this.getAttribute('src'), document.URL) : undefined;
     }
     set src(url: string | URL) {
         this.setAttribute('src', url instanceof URL ? url.href : url);
@@ -48,12 +46,7 @@ export class BorbDocument extends BorbBaseElement {
     set type(type: string) {
         this.setAttribute('type', type);
     }
-    displayText(
-        filename?: string,
-        title?: string,
-        text?: string,
-        closeable = false,
-    ) {
+    displayText(filename?: string, title?: string, text?: string, closeable = false) {
         if (!title && !this.title) {
             if (filename) {
                 this.title = filename.replace(/^.*\//, '');
@@ -82,20 +75,12 @@ export class BorbDocument extends BorbBaseElement {
         if (src && src.protocol === 'file') {
             console.log('Document – TODO display file: ', src);
             return;
-        } else if (
-            src &&
-            src.origin === docURL.origin &&
-            src.pathname === docURL.pathname
-        ) {
+        } else if (src && src.origin === docURL.origin && src.pathname === docURL.pathname) {
             if (src.hash) {
                 const srcElement = document.getElementById(src.hash.slice(1));
                 console.log('Document – TODO display element', src, srcElement);
             } else if (src.search) {
-                console.log(
-                    'Document – TODO display query',
-                    src,
-                    src.searchParams,
-                );
+                console.log('Document – TODO display query', src, src.searchParams);
             } else {
                 console.error('Invalid document URL', src, this);
             }
@@ -124,33 +109,19 @@ export class BorbDocument extends BorbBaseElement {
         if (srcText) {
             if (srcText !== this.srcText) {
                 this.srcText = srcText;
-                await this.engine(src).render_unsafe(
-                    this.textElement,
-                    this.srcText,
-                );
+                await this.engine(src).render_unsafe(this.textElement, this.srcText);
             }
         } else {
             this.textElement.textContent = '';
         }
-        render(
-            this.shadowRoot,
-            html`${this.styles || ''}${this.scrollElement}`,
-        );
+        render(this.shadowRoot, html`${this.styles || ''}${this.scrollElement}`);
     }
 
     closeHandler(ev: Event) {
-        console.log(
-            'closing document: name=%s, title=%s',
-            this.id,
-            this.title,
-            this,
-        );
+        console.log('closing document: name=%s, title=%s', this.id, this.title, this);
     }
     focus(options?: FocusOptions) {
         super.focus(options);
-    }
-    select(): void {
-        //
     }
 
     connectedCallback() {
@@ -159,12 +130,7 @@ export class BorbDocument extends BorbBaseElement {
             if (!this.shadowRoot) {
                 this.attachShadow({ mode: 'open' });
             }
-            console.log(
-                'element added to page.',
-                this,
-                this.isConnected,
-                this.shadowRoot,
-            );
+            console.log('element added to page.', this, this.isConnected, this.shadowRoot);
             this._observer.observe(this, {
                 childList: true,
                 attributeFilter: ['src', 'frame-title'],
@@ -178,12 +144,7 @@ export class BorbDocument extends BorbBaseElement {
     disconnectedCallback() {
         super.disconnectedCallback();
         this._observer.disconnect();
-        console.log(
-            'element  removed from page.',
-            this,
-            this.isConnected,
-            this.shadowRoot,
-        );
+        console.log('element  removed from page.', this, this.isConnected, this.shadowRoot);
     }
 }
 
