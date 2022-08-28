@@ -22,23 +22,23 @@ interface LogEntry {
     status: string;
 }
 export class MessagingError extends Error {
-    msg: Message;
+    msg?: Message;
     reply?: Message | Payload;
-    constructor(message: string, msg: Message, reply?: Message | Payload) {
+    conn?: Connection;
+    constructor(message: string, msg?: Message | Connection, reply?: Message | Payload) {
         super(`${message}: ${JSON.stringify(msg)}`);
-        this.msg = msg;
+        if (msg?.['deliverRemote']) {
+            this.conn = msg as Connection;
+        } else {
+            this.msg = msg as Message;
+        }
         this.reply = reply;
     }
 }
 export function fromMap<T>(value: T): T {
     function converter(value: unknown) {
         if (value instanceof Map) {
-            return fromPairs(
-                cloneDeepWith(
-                    toPairs(value as Map<string, unknown>),
-                    converter,
-                ),
-            );
+            return fromPairs(cloneDeepWith(toPairs(value as Map<string, unknown>), converter));
         }
     }
     return cloneDeepWith(value, converter);
@@ -125,13 +125,18 @@ class MessagingImpl {
             </table>`,
         );
     }
-    public route<T extends Payload, R extends Payload>(
-        msgType: string,
-        route: Method<T, R>,
-    ) {
+    public route<T extends Payload, R extends Payload>(msgType: string, route: Method<T, R>) {
         this.routes.set(msgType, route);
     }
 
+    public disconnect(conn: Connection, ...channels: string[]) {
+        if (this.connections.has(conn.id)) this.connections.delete(conn.id);
+        channels.forEach((ch) => {
+            const list = this.channels.get(ch);
+            const i = list?.indexOf(conn);
+            if (i >= 0) list.splice(i);
+        });
+    }
     public connect(conn: Connection, ...channels: string[]) {
         const enqueue = (message: Message) => {
             const logEntry: LogEntry = {
@@ -166,8 +171,7 @@ class MessagingImpl {
                             (content) =>
                                 enqueue({
                                     header: {
-                                        msg_type:
-                                            msg.header.msg_type + '_reply',
+                                        msg_type: msg.header.msg_type + '_reply',
                                         msg_id: `${this.seq++}`,
                                         ref_id: msg.header.msg_id,
                                         from: 'local:',
@@ -184,15 +188,10 @@ class MessagingImpl {
                                 //     },
                                 //     content: { status: 'error' },
                                 // }),
-                                this.errorMsg(msg.header.msg_id, err).then(
-                                    enqueue,
-                                ),
+                                this.errorMsg(msg.header.msg_id, err).then(enqueue),
                         )
                         .catch((err) => {
                             console.error('remote delivery error', err);
-                        })
-                        .then(() => {
-                            console.log('promise fulfilled', promise);
                         });
                 } else return Promise.resolve();
             };
@@ -207,17 +206,11 @@ class MessagingImpl {
             status: 'pending',
         };
         this._log.push(logEntry);
-        console.log('deliverRemoteRequest(%o)', msg);
         const socketSendRequest = (conn: Connection): Promise<Payload> => {
             logEntry.connection = conn;
             try {
                 logEntry.status = 'ok';
                 return new Promise((resolve, reject) => {
-                    console.log(
-                        'deliverRemoteRequest(%o) to conn=%o',
-                        msg,
-                        conn,
-                    );
                     this.requests.set(conn.id + ':' + msg.header.msg_id, {
                         resolve,
                         reject,
@@ -227,7 +220,7 @@ class MessagingImpl {
                 });
             } catch (e) {
                 logEntry.error = e;
-                console.error('remote delivery error:', e);
+                console.error('remote delivery error:', e, msg, conn);
                 logEntry.status = 'error';
                 throw e;
                 // if (e instanceof Error && e.name.startsWith('Jest')) {
@@ -245,6 +238,7 @@ class MessagingImpl {
             return Promise.race(channels.map((ch) => socketSendRequest(ch)));
         }
         const err = new MessagingError('No route for message', msg);
+        console.log('deliverRemoteRequest(%o) =>', msg, err);
         logEntry.error = err;
         return Promise.reject(err);
     }
@@ -260,13 +254,17 @@ class MessagingImpl {
         };
         this._log.push(logEntry);
         if (method) {
-            console.log('deliverLocalRequest(%o)', msg);
+            console.log(
+                '[%s: %s]  delivering local request',
+                msg.header.msg_id,
+                msg.header.msg_type,
+                JSON.stringify(msg),
+                msg,
+            );
             logEntry.status = 'ok';
             let promise: Promise<Payload>;
             try {
-                promise = Promise.resolve(
-                    method(msg.content) ?? { status: 'ok' },
-                );
+                promise = Promise.resolve(method(msg.content) ?? { status: 'ok' });
             } catch (e) {
                 console.error('local delivery error:', e);
                 logEntry.status = 'error';
@@ -291,11 +289,17 @@ class MessagingImpl {
         };
         this._log.push(logEntry);
         if (replyHandler) {
-            console.log('deliverLocalReply(%o)', msg);
+            console.log(
+                '[%s←%s: %s]  delivering local reply',
+                msg.header.ref_id,
+                msg.header.msg_id,
+                msg.header.msg_type,
+                JSON.stringify(msg),
+                msg,
+            );
             logEntry.status = 'ok';
             this.requests.delete(id);
-            if (msg.header.msg_type !== 'error_reply')
-                replyHandler.resolve(msg.content);
+            if (msg.header.msg_type !== 'error_reply') replyHandler.resolve(msg.content);
             else replyHandler.reject(new MessagingError('Error', msg));
             return;
         } else {
@@ -322,10 +326,7 @@ class MessagingImpl {
             },
         };
     }
-    public reply(
-        msg: Message,
-        content: Payload & { status?: string },
-    ): Message {
+    public reply(msg: Message, content: Payload & { status?: string }): Message {
         if (!content) content = { status: 'ok' };
         if (!content.status) content.status = 'ok';
         return {
@@ -337,21 +338,14 @@ class MessagingImpl {
             content,
         };
     }
-    public async send(
-        payload: Payload,
-        msgType: string,
-        to?: string,
-    ): Promise<Payload> {
+    public async send(payload: Payload, msgType: string, to?: string): Promise<Payload> {
         const msg: Message = {
             header: { msg_type: msgType, msg_id: `${this.seq++}` },
             content: payload,
         };
         if (!to) to = 'local:';
         msg.header.to = to;
-        return (
-            this._send(msg) ||
-            Promise.reject(new MessagingError('No route for message', msg))
-        );
+        return this._send(msg) || Promise.reject(new MessagingError('No route for message', msg));
     }
 
     _send(msg: Message) {
@@ -371,38 +365,49 @@ class MessagingImpl {
 
     fromMap = fromMap;
 }
+export type ConnectionStatus = 'starting' | 'connecting' | 'connected' | 'working' | 'closed';
+
 export class BaseConnection {
     queue: [Message, Transferable[]][] = [];
-    status = 'waiting';
-    connectHandlers = new Map<
-        string,
-        (conn: Connection, info: Payload) => void
-    >();
+    protected _status: ConnectionStatus = 'starting';
+    connectHandlers = new Map<string, (conn: Connection, info: Payload) => void>();
     disconnectHandler = new Map<string, (conn: Connection) => void>();
     channels: string[];
-    constructor(
-        public router: typeof Messaging,
-        public id: string,
-        ...channels: string[]
-    ) {
+    constructor(public router: typeof Messaging, public id: string, ...channels: string[]) {
         this.deliverHost = router.connect(this, ...channels);
         this.channels = channels;
     }
+    public get status(): ConnectionStatus {
+        return this._status;
+    }
+    close() {
+        this.router.disconnect(this, ...this.channels);
+        this._status = 'closed';
+        this.deliverHost = undefined;
+    }
     enqueue = (msg: Message, ...buffers: Transferable[]): void => {
-        console.log('enqueue(%s,%o)', JSON.stringify(msg.header), msg);
         this.queue.push([msg, buffers]);
         if (this.queue.length === 1) queueMicrotask(() => this.processQueue());
     };
     processQueue() {
-        this.status = 'processing';
-        let msg: [Message, Transferable[]] | undefined;
-        console.log('processing queue');
-        while ((msg = this.queue.shift())) {
-            console.log('delivering to', this.id, msg);
-            this.deliverRemote(...msg);
+        if (this.queue.length === 0) return;
+        try {
+            this._status = 'working';
+            let msg: [Message, Transferable[]] | undefined;
+            while ((msg = this.queue.shift())) {
+                console.log(
+                    '[%s: %s]  delivering to %s:',
+                    msg[0].header.msg_id,
+                    msg[0].header.msg_type,
+                    this.id,
+                    JSON.stringify(msg[0]),
+                    msg,
+                );
+                this.deliverRemote(...msg);
+            }
+        } finally {
+            if (this._status === 'working') this._status = 'connected';
         }
-        console.log('processing done');
-        this.status = 'waiting';
     }
     deliverRemote(msg: Message, transfers: Transferable[]) {
         console.log('SEND', msg);
@@ -423,6 +428,14 @@ export class BaseConnection {
     send(msg: Message): void | Promise<void | Payload> {
         throw new MessagingError('Function not implemented', msg);
     }
+
+    get isReady() {
+        return this._status === 'connected' || this._status === 'working';
+    }
+
+    toString() {
+        return `Connection(${this.id})`;
+    }
 }
 
 const _self = new MessagingImpl();
@@ -431,10 +444,7 @@ export function createMessaging() {
     return new MessagingImpl();
 }
 
-export const Messaging = Systems.declare(_self)
-    .reloadable(false)
-    .depends()
-    .register();
+export const Messaging = Systems.declare(_self).reloadable(false).depends().register();
 
 if (import.meta.webpackHot) {
     import.meta.webpackHot.decline();

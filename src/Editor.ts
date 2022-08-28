@@ -429,6 +429,7 @@ class EditorEvent<T> extends CustomEvent<T> {
         });
     }
 }
+
 /** Return a query that matches editors open on the given path name */
 const queryForFile = (path: string) => `${BorbEditor.tag}[path-name="${CSS.escape(path)}"]`;
 /** Find an editor currently open on the given path name. Returns null if not found  */
