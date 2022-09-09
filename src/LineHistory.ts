@@ -15,8 +15,7 @@ const previousVersion: typeof _self_proto =
 
 function make_key(s: string, id?: number): [string, string, number?] {
     const i = s.indexOf('/');
-    const key: [string, string, number?] =
-        i > 0 ? [s.slice(0, i), s.slice(i + 1)] : [s, ''];
+    const key: [string, string, number?] = i > 0 ? [s.slice(0, i), s.slice(i + 1)] : [s, ''];
     if (id !== undefined) key.push(id);
     return key;
 }
@@ -103,11 +102,7 @@ export enum SearchDirection {
     FORWARDS = 1,
 }
 export interface HistorySession {
-    search(
-        query: string,
-        dir?: SearchDirection,
-        skip?: boolean,
-    ): Promise<Entry | undefined>;
+    search(query: string, dir?: SearchDirection, skip?: boolean): Promise<Entry | undefined>;
     init(): Promise<void>;
     get(id?: number): Promise<Entry>;
     edit(line: string): Promise<number>;
@@ -237,13 +232,8 @@ class DBHistorySession implements HistorySession {
 const DBHistory: HistoryManager = {
     _id: id,
     _revision: revision,
-    async forSession(
-        session: string,
-        persistent = true,
-    ): Promise<HistorySession> {
-        const hist = persistent
-            ? new DBHistorySession(session)
-            : new FakeHistorySession(session);
+    async forSession(session: string, persistent = true): Promise<HistorySession> {
+        const hist = persistent ? new DBHistorySession(session) : new FakeHistorySession(session);
         await hist.init();
         return hist;
     },
@@ -303,8 +293,7 @@ const DBHistory: HistoryManager = {
                 .count();
             const s = seen[session.session];
             if (s) {
-                if (session.shell && count)
-                    s.shells.push([session.shell, count]);
+                if (session.shell && count) s.shells.push([session.shell, count]);
             } else {
                 session = { ...session, shells: [[session.shell, count]] };
                 seen[session.session] = session;
@@ -330,11 +319,7 @@ class FakeHistorySession implements HistorySession {
     line?: string;
 
     constructor(private readonly session: string) {}
-    async search(
-        query: string,
-        dir?: SearchDirection,
-        skip?: boolean,
-    ): Promise<Entry> {
+    async search(query: string, dir?: SearchDirection, skip?: boolean): Promise<Entry> {
         throw new Error('Method not implemented.');
     }
     async get(id?: number): Promise<Entry> {
@@ -435,14 +420,10 @@ const _self_proto = {
     _id: id,
     _revision: revision,
     forSession(session: string): Promise<HistorySession> {
-        return Systems.waitFor<HistoryManager>(_self_proto._id).then((h) =>
-            h.forSession(session),
-        );
+        return Systems.waitFor<HistoryManager>(_self_proto._id).then((h) => h.forSession(session));
     },
     get(session: string, id?: number): Promise<Entry> {
-        return Systems.waitFor<HistoryManager>(_self_proto._id).then((h) =>
-            h.get(session, id),
-        );
+        return Systems.waitFor<HistoryManager>(_self_proto._id).then((h) => h.get(session, id));
     },
     put(session: string, data: string, id?: number): Promise<number> {
         return Systems.waitFor<HistoryManager>(_self_proto._id).then((h) =>
@@ -450,19 +431,13 @@ const _self_proto = {
         );
     },
     list(session: string): Promise<Entry[]> {
-        return Systems.waitFor<HistoryManager>(_self_proto._id).then((h) =>
-            h.list(session),
-        );
+        return Systems.waitFor<HistoryManager>(_self_proto._id).then((h) => h.list(session));
     },
     sessions(sortBy?: string): Promise<Session[]> {
-        return Systems.waitFor<HistoryManager>(_self_proto._id).then((h) =>
-            h.sessions(sortBy),
-        );
+        return Systems.waitFor<HistoryManager>(_self_proto._id).then((h) => h.sessions(sortBy));
     },
     currentId(session: string): Promise<number> {
-        return Systems.waitFor<HistoryManager>(_self_proto._id).then((h) =>
-            h.currentId(session),
-        );
+        return Systems.waitFor<HistoryManager>(_self_proto._id).then((h) => h.currentId(session));
     },
 };
 

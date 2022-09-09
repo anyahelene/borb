@@ -39,9 +39,7 @@ function newLine(elt: HTMLElement) {
 export class BorbTerminal extends BorbBaseElement implements Printer {
     static tag = tagName('terminal', revision);
 
-    private _observer: MutationObserver = new MutationObserver((muts) =>
-        this.queueUpdate(true),
-    );
+    private _observer: MutationObserver = new MutationObserver((muts) => this.queueUpdate(true));
     private _keydownListener = (ev: KeyboardEvent) => {
         console.log(ev);
         if (ev.ctrlKey && ev.key === 'c') {
@@ -117,12 +115,7 @@ export class BorbTerminal extends BorbBaseElement implements Printer {
     }
     display(obj: DisplayData) {
         if (!obj.type.startsWith('image/')) {
-            console.warn(
-                "%o.display(%o): don't know how to display %s",
-                this,
-                obj,
-                obj.type,
-            );
+            console.warn("%o.display(%o): don't know how to display %s", this, obj, obj.type);
             return;
         }
         let url = obj.url instanceof URL ? obj.url.toString() : obj.url;
@@ -154,12 +147,7 @@ export class BorbTerminal extends BorbBaseElement implements Printer {
             const session = settings.getConfig('session.name', '_');
             const shellName = this.getAttribute('shell') || '';
             const historyId = (session + '/' + shellName).replace(' ', '');
-            console.log(
-                'opening %s shell for %s',
-                shellName,
-                session,
-                historyId,
-            );
+            console.log('opening %s shell for %s', shellName, session, historyId);
 
             console.log('element added to page.', this);
             this._observer.observe(this, {
