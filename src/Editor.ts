@@ -188,7 +188,9 @@ export class BorbEditor extends BorbBaseElement {
         });
         if (path) {
             path = language.addFileExt(path); // add if not already there
+            console.log('Path:', path);
             path = BorbEditor.io.resolve(path);
+            console.log('Resolved:', path);
         }
         this.#setPathName(path, language);
         this.#replaceDoc(text, language);
@@ -341,7 +343,7 @@ export class BorbEditor extends BorbBaseElement {
         const selection = pos
             ? { anchor: pos < 0 ? text.length + 1 + pos : pos }
             : this._initialSelection;
-        console.log('createState: ', lang, text, text.length, pos, selection);
+        console.log('createState: ', lang, text, text?.length, pos, selection);
         return EditorState.create({
             doc: text || '',
             extensions: [

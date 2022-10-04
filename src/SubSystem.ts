@@ -19,8 +19,7 @@ class SubSysBuilder<T extends { _id?: string; _revision?: number }> {
 
     constructor(name: string, protoOrApi: T | (new () => T), revision: number) {
         this.sys = SubSystem.get(name);
-        if (this.sys.data)
-            revision = Math.max(this.sys.data.revision + 1, revision);
+        if (this.sys.data) revision = Math.max(this.sys.data.revision + 1, revision);
         this.sys._newData = this.data = {
             revision,
             deps: new Set<SubSystem<API>>(),
@@ -41,9 +40,7 @@ class SubSysBuilder<T extends { _id?: string; _revision?: number }> {
 
     depends(...deps: (string | { _id: string })[]): this {
         for (const d of deps) {
-            this.data.deps.add(
-                SubSystem.get(typeof d === 'string' ? d : d._id),
-            );
+            this.data.deps.add(SubSystem.get(typeof d === 'string' ? d : d._id));
         }
 
         return this;
@@ -120,9 +117,7 @@ function proxy<T extends API>(target: T | (new () => T), dep: SubSystem<T>) {
                         await SubSystem.waitFor<T>(dep.name);
                         const fn = dep.data?.api[p];
                         if (typeof fn === 'function' && !fn.proxy) {
-                            console.trace(
-                                `calling proxy for ${name}.${String(p)}`,
-                            );
+                            console.trace(`calling proxy for ${name}.${String(p)}`);
                             return fn(args);
                         }
                         throw new TypeError(`${String(p)} is not a function`);
@@ -133,18 +128,12 @@ function proxy<T extends API>(target: T | (new () => T), dep: SubSystem<T>) {
                 return f;
             } else {
                 console.error(
-                    `Accessing ${dep.name}.${String(p)} before ${
-                        dep.name
-                    } is ready`,
+                    `Accessing ${dep.name}.${String(p)} before ${dep.name} is ready`,
                     target,
                     p,
                     receiver,
                 );
-                throw new Error(
-                    `Accessing ${dep.name}.${String(p)} before ${
-                        dep.name
-                    } is ready`,
-                );
+                throw new Error(`Accessing ${dep.name}.${String(p)} before ${dep.name} is ready`);
             }
         },
     });
@@ -240,9 +229,7 @@ export class SubSystem<T extends API> {
         console.log(
             this.toString(),
             ':',
-            [...(this.data?.deps ?? this._newData?.deps ?? [])]
-                .map((d) => d.name)
-                .join(', '),
+            [...(this.data?.deps ?? this._newData?.deps ?? [])].map((d) => d.name).join(', '),
         );
     }
 
@@ -279,24 +266,16 @@ export class SubSystem<T extends API> {
         }
         SubSystem.setupResolve(targetObject);
     }
-    static async waitFor<T extends API>(
-        sysOrName: string | (T & { _id: string }),
-    ): Promise<T> {
-        const dep = SubSystem.get(
-            typeof sysOrName === 'string' ? sysOrName : sysOrName._id,
-        );
+    static async waitFor<T extends API>(sysOrName: string | (T & { _id: string })): Promise<T> {
+        const dep = SubSystem.get(typeof sysOrName === 'string' ? sysOrName : sysOrName._id);
         console.log('waiting for', dep);
         await dep.promise;
         console.log('waited for', dep);
         return Promise.resolve(dep.api as T);
     }
-    static async waitForAll(
-        ...sysOrNames: (string | { _id: string })[]
-    ): Promise<void> {
+    static async waitForAll(...sysOrNames: (string | { _id: string })[]): Promise<void> {
         const deps = sysOrNames.map((sysOrName) =>
-            SubSystem.get(
-                typeof sysOrName === 'string' ? sysOrName : sysOrName._id,
-            ),
+            SubSystem.get(typeof sysOrName === 'string' ? sysOrName : sysOrName._id),
         );
         console.log('waiting for', deps);
         await Promise.all(deps.map((d) => d.promise));
@@ -321,10 +300,7 @@ export class SubSystem<T extends API> {
     private setApi() {
         const data = this.data || this._newData;
         let api = data.api;
-        if (
-            SubSystem.alwaysProxy ||
-            (SubSystem.makeProxies && (!api || !this.data))
-        ) {
+        if (SubSystem.alwaysProxy || (SubSystem.makeProxies && (!api || !this.data))) {
             api = this.proxy = proxy(data.api ?? data.proto ?? {}, this);
         } else {
             this.proxy = undefined;
@@ -347,9 +323,7 @@ export class SubSystem<T extends API> {
                 delete this._newData;
                 data.state = State.STARTING;
                 if (data.start) {
-                    console.groupCollapsed(
-                        `Starting ${this.name} rev.${data.revision}`,
-                    );
+                    console.groupCollapsed(`Starting ${this.name} rev.${data.revision}`);
                     const res = data.start(this);
                     console.groupEnd();
                     if (isPromise(res)) {
@@ -361,7 +335,7 @@ export class SubSystem<T extends API> {
                 }
                 this.setApi();
                 if (data.customElements && data.customElements.length > 0)
-                    this.defineCustomElements();
+                    await this.defineCustomElements();
                 data.state = State.STARTED;
                 // console.groupEnd();
                 console.log('Started', this.toString());
@@ -374,9 +348,7 @@ export class SubSystem<T extends API> {
                     reason.message = `In subsystem ‘${this.name}’: ${reason.message}`;
                     return Promise.reject(reason);
                 } else {
-                    return Promise.reject(
-                        new Error(`In subsystem ‘${this.name}’: ${reason}`),
-                    );
+                    return Promise.reject(new Error(`In subsystem ‘${this.name}’: ${reason}`));
                 }
             }
         } else {
@@ -385,15 +357,11 @@ export class SubSystem<T extends API> {
         }
     }
 
-    private defineCustomElements() {
+    private async defineCustomElements(): Promise<void> {
         console.groupCollapsed(`Defining ${this.name} custom elements`);
         this.data.customElements.forEach((eltDef) => {
             try {
-                console.debug(
-                    'defining custom element %s: %o',
-                    eltDef.tag,
-                    eltDef,
-                );
+                console.debug('defining custom element %s: %o', eltDef.tag, eltDef);
                 customElements.define(eltDef.tag, eltDef);
                 if (this.data.revision > 0) upgradeElements(eltDef);
             } catch (e) {
@@ -404,20 +372,13 @@ export class SubSystem<T extends API> {
     }
 
     static declare<T extends API>(
-        nameOrObj:
-            | string
-            | ((T | (new () => T)) & { _id: string; _revision?: number }),
+        nameOrObj: string | ((T | (new () => T)) & { _id: string; _revision?: number }),
         prototype?: T,
         revision = 0,
     ): SubSysBuilder<T> {
-        if (typeof nameOrObj === 'string')
-            return new SubSysBuilder(nameOrObj, prototype, revision);
+        if (typeof nameOrObj === 'string') return new SubSysBuilder(nameOrObj, prototype, revision);
         else if (nameOrObj._id)
-            return new SubSysBuilder(
-                nameOrObj._id,
-                nameOrObj,
-                nameOrObj._revision ?? revision,
-            );
+            return new SubSysBuilder(nameOrObj._id, nameOrObj, nameOrObj._revision ?? revision);
     }
 }
 

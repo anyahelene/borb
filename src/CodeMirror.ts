@@ -52,19 +52,12 @@ import { java } from '@codemirror/lang-java';
 import { cpp } from '@codemirror/lang-cpp';
 import { python } from '@codemirror/lang-python';
 import { html } from '@codemirror/lang-html';
-import {
-    markdown,
-    insertNewlineContinueMarkup,
-} from '@codemirror/lang-markdown';
+import { markdown, insertNewlineContinueMarkup } from '@codemirror/lang-markdown';
 import { css } from '@codemirror/lang-css';
 import { z80 } from '@codemirror/legacy-modes/mode/z80';
 import { shell } from '@codemirror/legacy-modes/mode/shell';
 import { oneDark } from '@codemirror/theme-one-dark';
-import {
-    darkDuck,
-    darkDuckHighlightSpec,
-    darkDuckHighlighter,
-} from './themes/dark-duck';
+import { darkDuck, darkDuckHighlightSpec, darkDuckHighlighter } from './themes/dark-duck';
 import {
     closeLintPanel,
     lintKeymap,
@@ -134,6 +127,9 @@ export function stdConfig() {
     ];
 }
 const configs = { '': [] };
+export function defineLang(lang: string, langext: LanguageSupport) {
+    configs[lang] = langext;
+}
 export function langConfig(lang: string) {
     if (configs[lang]) {
         return configs[lang];
@@ -152,16 +148,16 @@ export function langConfig(lang: string) {
             langext = markdown({ addKeymap: false });
         } else if (lang == 'css') {
             langext = css();
-        } else if (lang == 'cpp') {
+        } else if (lang == 'cpp' || lang == 'c') {
             langext = [cpp(), indentUnit.of('    ')];
         } else if (lang == 'z80') {
             console.log('z80');
             langext = new LanguageSupport(StreamLanguage.define(z80));
             console.log(langext);
-        } else if (lang == 'shell') {
-            console.log('shell');
-            langext = new LanguageSupport(StreamLanguage.define(shell));
-            console.log(langext);
+            // } else if (lang == 'shell') {
+            //     console.log('shell');
+            //     langext = new LanguageSupport(StreamLanguage.define(shell));
+            //     console.log(langext);
         } else if (lang == 'plain') {
             langext = [];
         }
@@ -176,8 +172,7 @@ export function langConfig(lang: string) {
 }
 export function fontConfig(elt: HTMLElement) {
     let fontFamily = window.getComputedStyle(elt).fontFamily;
-    if (!fontFamily)
-        fontFamily = window.getComputedStyle(document.body).fontFamily;
+    if (!fontFamily) fontFamily = window.getComputedStyle(document.body).fontFamily;
     const myFontTheme = EditorView.theme({
         '.cm-scroller': {
             fontFamily: 'inherit',
@@ -307,11 +302,7 @@ export function highlightTree(state: EditorState, prompt: HTMLElement) {
         else if (cls2 == null) return cls1;
         else return cls1 + ' ' + cls2;
     }
-    Highlight.highlightTree(
-        tree,
-        [darkDuckHighlighter, Highlight.classHighlighter],
-        hilight,
-    );
+    Highlight.highlightTree(tree, [darkDuckHighlighter, Highlight.classHighlighter], hilight);
     //	join(darkDuckHighlightStyle.match(tag, scope), classHighlightStyle.match(tag, scope)), highlight);
     nolight(doc.length);
     console.log('line', line, 'result', result);
@@ -360,10 +351,7 @@ declare module 'style-mod' {
 }
 // for each style rule, split, e.g., ".ͼu {color: #cc0;}" into ".ͼu": "{color: #cc0;}"
 darkDuckHighlighter.module.rules.forEach((rule: string) => {
-    highlight.darkDuckStyle[rule.replace(/\s*{.*$/, '')] = rule.replace(
-        /^[^{]*{/,
-        '{',
-    );
+    highlight.darkDuckStyle[rule.replace(/\s*{.*$/, '')] = rule.replace(/^[^{]*{/, '{');
 });
 // build definitions for classHighlighter css classes based on defs from darkDuckHighlighter
 console.groupCollapsed('editor styles');
@@ -373,8 +361,7 @@ for (const tag in Highlight.tags) {
         const ddStyleClass = '.' + darkDuckHighlighter.style([t]);
         const clsStyleClass = '.' + Highlight.classHighlighter.style([t]);
         console.log(ddStyleClass, clsStyleClass);
-        highlight.classStyle[clsStyleClass] =
-            highlight.darkDuckStyle[ddStyleClass] || '{}';
+        highlight.classStyle[clsStyleClass] = highlight.darkDuckStyle[ddStyleClass] || '{}';
     }
 }
 console.groupEnd();

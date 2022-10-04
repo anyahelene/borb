@@ -25,16 +25,16 @@ export function sysId(url: string) {
     return `${borbName}/${url.match(/(\w+)\.ts/)[1].toLowerCase()}`;
 }
 export function assert<T>(
-    cond: T | (() => T),
+    cond: T | ((...args: unknown[]) => T),
     recover: (() => void) | unknown,
     ...args: unknown[]
 ): T {
-    if (typeof cond === 'function') {
-        cond = (cond as () => T)();
-    }
     if (typeof recover !== 'function') {
         args = [recover, ...args];
         recover = undefined;
+    }
+    if (typeof cond === 'function') {
+        cond = (cond as (...args: unknown[]) => T)(...args);
     }
     if (!cond) {
         console.error('Assertion failed: ', ...args);
@@ -75,7 +75,9 @@ export function uniqueId(...strOrElts: (Element | string)[]): string {
     }
     return `${prefix}${suffix}${unique++}`;
 }
-
+export function uniqueIdNumber(): number {
+    return unique++;
+}
 let keyhandler: (key: string, button?: HTMLElement, event?: Event) => Promise<unknown> = (key) =>
     Promise.resolve();
 export function setKeyHandler(

@@ -1,14 +1,6 @@
-import {
-    indentLess,
-    indentMore,
-    insertNewlineAndIndent,
-} from '@codemirror/commands';
+import { indentLess, indentMore, insertNewlineAndIndent } from '@codemirror/commands';
 import { insertNewlineContinueMarkup } from '@codemirror/lang-markdown';
-import {
-    getIndentation,
-    IndentContext,
-    syntaxTree,
-} from '@codemirror/language';
+import { getIndentation, IndentContext, syntaxTree } from '@codemirror/language';
 import {
     ChangeSpec,
     EditorSelection,
@@ -25,6 +17,7 @@ import Editor, {
     stdConfig,
     highlightTree,
     paste,
+    langConfig,
 } from './CodeMirror';
 import { NodeProp } from '@lezer/common';
 import { LineHistory, HistorySession, Entry } from './LineHistory';
@@ -72,6 +65,8 @@ const historyKeys = {
     arrowDown: 'next',
     pageUp: 'first',
     pageDown: 'last',
+    modArrowUp: 'prev',
+    modArrowDown: 'next',
 };
 export class LineEditor {
     public history: HistorySession;
@@ -98,6 +93,8 @@ export class LineEditor {
             arrowDown: () => this.history.next(),
             pageUp: () => this.history.first(),
             pageDown: () => this.history.last(),
+            modArrowUp: () => this.history.prev(),
+            modArrowDown: () => this.history.next(),
         };
         this.terminal.status = 'waiting';
 
@@ -114,8 +111,7 @@ export class LineEditor {
                     this.terminal.inputElement,
                     '',
                     lang?.editMode || 'plain',
-                    (key, state, dispatch) =>
-                        this.handleKey(key, state, dispatch),
+                    (key, state, dispatch) => this.handleKey(key, state, dispatch),
                     this.terminal.shadowRoot,
                 );
             }),
@@ -128,11 +124,7 @@ export class LineEditor {
         });
     }
 
-    handleKey(
-        key: string,
-        state: EditorState,
-        dispatch: (tr: Transaction) => void,
-    ): boolean {
+    handleKey(key: string, state: EditorState, dispatch: (tr: Transaction) => void): boolean {
         console.log('Terminal input:', key);
         const line = state.sliceDoc(0);
         if (!this.history) return false;
@@ -142,11 +134,7 @@ export class LineEditor {
                     .then((res) => {
                         if (res && res.more) {
                             this.history.edit(res.more);
-                            replaceDoc(
-                                this._view.state,
-                                this._view.dispatch,
-                                res.more,
-                            );
+                            replaceDoc(this._view.state, this._view.dispatch, res.more);
                         }
                         if (this.afterEnter) this.afterEnter(line, this);
                         return res;
@@ -204,8 +192,7 @@ export class LineEditor {
 }
 
 function isBetweenBrackets(state: EditorState, pos: number) {
-    if (/\(\)|\[\]|\{\}/.test(state.sliceDoc(pos - 1, pos + 1)))
-        return { from: pos, to: pos };
+    if (/\(\)|\[\]|\{\}/.test(state.sliceDoc(pos - 1, pos + 1))) return { from: pos, to: pos };
     const context = syntaxTree(state).resolve(pos);
     const before = context.childBefore(pos),
         after = context.childAfter(pos);
@@ -227,11 +214,7 @@ export const createLineEditor = function (
     elt: HTMLElement,
     text: string,
     lang: string,
-    handler: (
-        key: string,
-        state: EditorState,
-        dispatch: (tr: Transaction) => void,
-    ) => boolean,
+    handler: (key: string, state: EditorState, dispatch: (tr: Transaction) => void) => boolean,
     root: Document | ShadowRoot = document,
 ) {
     const outer = elt;
@@ -246,17 +229,12 @@ export const createLineEditor = function (
                 const text = state.sliceDoc(range.from);
                 console.log('text: ', JSON.stringify(text));
                 // check if we're in the middle of the text
-                if (
-                    text.length > 0 &&
-                    (!text.match(/^\r?\n/) || text.startsWith('/'))
-                ) {
+                if (text.length > 0 && (!text.match(/^\r?\n/) || text.startsWith('/'))) {
                     // TODO: line-break setting?
                     isComplete = true;
                     return { range };
                 }
-                const explode =
-                    range.from == range.to &&
-                    isBetweenBrackets(state, range.from);
+                const explode = range.from == range.to && isBetweenBrackets(state, range.from);
                 const cx = new IndentContext(state, {
                     simulateBreak: range.from,
                     simulateDoubleBreak: !!explode,
@@ -264,8 +242,7 @@ export const createLineEditor = function (
                 let indent = getIndentation(cx, range.from);
                 console.log('indent0: ', indent);
                 if (indent == null)
-                    indent = /^\s*/.exec(state.doc.lineAt(range.from).text)[0]
-                        .length;
+                    indent = /^\s*/.exec(state.doc.lineAt(range.from).text)[0].length;
                 console.log('indent1: ', indent, 'explode: ', explode);
                 if (indent || explode) isComplete = false;
 
@@ -314,13 +291,6 @@ export const createLineEditor = function (
         lang === 'markdown' || lang === 'chat'
             ? insertNewlineContinueMarkup
             : insertNewlineAndIndent;
-    const arrowUp: StateCommand = ({ state, dispatch }) => {
-        return handler('arrowUp', state, dispatch);
-    };
-
-    const arrowDown: StateCommand = ({ state, dispatch }) => {
-        return handler('arrowDown', state, dispatch);
-    };
 
     const state = EditorState.create({
         doc: '',
@@ -328,8 +298,17 @@ export const createLineEditor = function (
             keymap.of([
                 { key: 'Enter', run: enter, shift: shiftEnter },
                 { key: 'Tab', run: tab, shift: indentLess },
+                {
+                    key: 'Mod-ArrowUp',
+                    run: ({ state, dispatch }) => handler('modArrowUp', state, dispatch),
+                },
+                {
+                    key: 'Mod-ArrowDown',
+                    run: ({ state, dispatch }) => handler('modArrowDown', state, dispatch),
+                },
             ]),
             fontConfig(elt),
+            langConfig(lang || 'plain'),
             stdConfig(),
             EditorView.theme({
                 '.cm-lineNumbers .cm-gutterElement': {
@@ -337,8 +316,14 @@ export const createLineEditor = function (
                 },
             }),
             keymap.of([
-                { key: 'ArrowUp', run: arrowUp },
-                { key: 'ArrowDown', run: arrowDown },
+                {
+                    key: 'ArrowUp',
+                    run: ({ state, dispatch }) => handler('arrowUp', state, dispatch),
+                },
+                {
+                    key: 'ArrowDown',
+                    run: ({ state, dispatch }) => handler('arrowDown', state, dispatch),
+                },
             ]),
         ],
     });

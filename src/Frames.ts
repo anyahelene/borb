@@ -245,6 +245,7 @@ export class BorbFrame extends BorbBaseElement {
         this._overlay.style.zIndex = '99';
         this._overlay.style.transform = 'scale(-8,8) translate(-50%,50%)';
         this._overlay.style.textShadow = '#fff 0px 0px 1px, #fff 0px 0px 5px';
+        this._overlay.style.pointerEvents = 'none';
         this._header.dataset.drop = 'true';
         this._header.addEventListener('borbdragenter', (ev: BorbDragEvent) => {
             if (ev.dragSource instanceof TabEntry && ev.dragSource.canDropTo(this)) {
@@ -554,10 +555,15 @@ export class BorbPanelBuilder<T extends HTMLElement = HTMLElement> {
         this._title = title;
         return this;
     }
-    panel<U extends HTMLElement = T>(panel: string): BorbPanelBuilder<U>;
+    panel<U extends HTMLElement = T>(panel: string, id?: string): BorbPanelBuilder<U>;
     panel<U extends HTMLElement>(panel: U): BorbPanelBuilder<U>;
-    panel<U extends HTMLElement>(panel: U | string): BorbPanelBuilder<U> | this {
+    panel<U extends HTMLElement>(panel: U | string, id?: string): BorbPanelBuilder<U> | this {
         if (typeof panel === 'string') {
+            if (id) {
+                this._id = id;
+                this._panel = document.getElementById(id) as T;
+                if (this._panel) return this;
+            }
             this._panel = document.createElement(panel) as T;
             return this;
         } else {
@@ -575,7 +581,7 @@ export class BorbPanelBuilder<T extends HTMLElement = HTMLElement> {
         if (!this._frame) this._error.push(`no frame specified`);
 
         if (!this._title) this._error.push(`no title specified`);
-        if (this._strict && this._error !== []) throw new Error(this._error.join('; '));
+        if (this._strict && this._error.length > 0) throw new Error(this._error.join('; '));
 
         if (!this._panel) this._panel = document.createElement('section') as T;
         if (this._title) this._panel.setAttribute('tab-title', this._title);

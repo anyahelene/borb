@@ -7,7 +7,7 @@ import { tags } from '@lezer/highlight';
 const type = '#cc0',
     name = '#3f3',
     op = '#56b6c2',
-    invalid = '#ffffff',
+    invalid = '#f33',
     def = '#8f8',
     comment = '#880',
     func = '#3f3',
@@ -41,8 +41,9 @@ const darkDuckTheme = EditorView.theme(
         '.cm-cursorLayer': { mixBlendMode: 'exclusion' },
         '&.cm-focused .cm-cursor-secondary': { borderLeftColor: '#ff0' },
         '.cm-cursor-secondary': { borderLeftColor: '#880' },
-        '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content::selection':
-            { backgroundColor: selection },
+        '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content::selection': {
+            backgroundColor: selection,
+        },
         '.cm-panels': { backgroundColor: darkBackground, color: def },
         '.cm-panels.cm-panels-top': { borderBottom: '1px solid #8808' },
         '.cm-panels.cm-panels-bottom': { borderTop: '1px solid #8808' },
@@ -59,11 +60,10 @@ const darkDuckTheme = EditorView.theme(
         },
         //   ".cm-activeLine": { backgroundColor: background, textShadow: "none" },
         '.cm-selectionMatch': { backgroundColor: '#aafe661a' },
-        '&.cm-focused .cm-matchingBracket, &.cm-focused .cm-nonmatchingBracket':
-            {
-                backgroundColor: '#bad0f847',
-                outline: '1px solid #515a6b',
-            },
+        '&.cm-focused .cm-matchingBracket, &.cm-focused .cm-nonmatchingBracket': {
+            backgroundColor: '#bad0f847',
+            outline: '1px solid #515a6b',
+        },
         '.cm-gutters': {
             //		background: "linear-gradient(90deg, #220f 0%, #2200 100%)",
             backgroundColor: background,
@@ -193,15 +193,13 @@ const darkDuckHighlightSpec = [
     {
         tag: tags.invalid,
         color: invalid,
+        textDecoration: 'underline wavy red .05rem',
     },
 ];
 const darkDuckHighlighter = HighlightStyle.define(darkDuckHighlightSpec);
 
 /// Extension to enable the One Dark theme (both the editor theme and
 /// the highlight style).
-const darkDuck: Extension = [
-    darkDuckTheme,
-    syntaxHighlighting(darkDuckHighlighter),
-];
+const darkDuck: Extension = [darkDuckTheme, syntaxHighlighting(darkDuckHighlighter)];
 
 export { darkDuck, darkDuckHighlighter, darkDuckTheme, darkDuckHighlightSpec };

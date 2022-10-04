@@ -1,4 +1,4 @@
-import StackTrace from 'stacktrace-js';
+import StackTrace, { StackFrame } from 'stacktrace-js';
 import { cloneDeepWith, fromPairs, toPairs } from 'lodash-es';
 import Systems from './SubSystem';
 import { sysId } from './Common';
@@ -21,16 +21,25 @@ interface LogEntry {
     handler?: Monitor<Payload> | Method<Payload, Payload>;
     status: string;
 }
+
 export class MessagingError extends Error {
     msg?: Message;
     reply?: Message | Payload;
     conn?: Connection;
-    constructor(message: string, msg?: Message | Connection, reply?: Message | Payload) {
-        super(`${message}: ${JSON.stringify(msg)}`);
-        if (msg?.['deliverRemote']) {
-            this.conn = msg as Connection;
+    constructor(message: string | Message, msg?: Message | Connection, reply?: Message | Payload) {
+        if (typeof message === 'object') {
+            const ename = message.content.ename;
+            const evalue = message.content.evalue;
+            const tb = message.content.traceback;
+            super(`${ename}: ${evalue}`);
+            this.msg = message;
         } else {
-            this.msg = msg as Message;
+            super(`${message}: ${JSON.stringify(msg)}`);
+            if (msg?.['deliverRemote']) {
+                this.conn = msg as Connection;
+            } else {
+                this.msg = msg as Message;
+            }
         }
         this.reply = reply;
     }
@@ -63,7 +72,16 @@ export interface Header {
     to?: string;
     status?: 'ok' | 'error';
 }
-
+export interface ExceptionData {
+    exception?: string;
+    ename: string;
+    evalue: string;
+    traceback: (string | StackFrame)[];
+    cause?: ExceptionData;
+}
+export interface ReplyData {
+    status: 'error' | 'ok';
+}
 export type Payload = Record<string, unknown>;
 export type Method<REQUEST extends Payload, REPLY extends Payload> = (
     msg: REQUEST,
@@ -300,7 +318,7 @@ class MessagingImpl {
             logEntry.status = 'ok';
             this.requests.delete(id);
             if (msg.header.msg_type !== 'error_reply') replyHandler.resolve(msg.content);
-            else replyHandler.reject(new MessagingError('Error', msg));
+            else replyHandler.reject(new MessagingError(msg));
             return;
         } else {
             console.warn('unexpected reply:', id, msg);
@@ -309,21 +327,27 @@ class MessagingImpl {
             return;
         }
     }
+    public async errorData(err: Error): Promise<ExceptionData> {
+        const st = (err.stack || '').split('\n');
+        //const st = await StackTrace.fromError(err);
+        return {
+            ename: err.name,
+            evalue: err.message,
+            traceback: st,
+        };
+    }
 
     public async errorMsg(ref_id: string, err: Error): Promise<Message> {
-        const st = await StackTrace.fromError(err);
+        const content = (await this.errorData(err)) as unknown as Payload;
+        content.status = 'error';
+
         return {
             header: {
                 msg_type: 'error_reply',
                 msg_id: `${this.seq++}`,
                 ref_id,
             },
-            content: {
-                status: 'error',
-                ename: err.name,
-                evalue: err.message,
-                traceback: st,
-            },
+            content,
         };
     }
     public reply(msg: Message, content: Payload & { status?: string }): Message {
