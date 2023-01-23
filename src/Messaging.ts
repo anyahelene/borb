@@ -58,6 +58,15 @@ export interface Connection {
     enqueue(data: Message, ...buffers: ArrayBuffer[]): void;
 
     deliverHost: (msg: Message) => Promise<void>;
+    addHandlers(
+        owner: string,
+        connectHandler: (conn: Connection, info: Payload) => void,
+        disconnectHandler: (conn: Connection) => void,
+    ): void;
+
+    removeHandlers(owner: string): void;
+
+    close(): void;
 }
 
 export interface Message {
@@ -355,7 +364,7 @@ class MessagingImpl {
         if (!content.status) content.status = 'ok';
         return {
             header: {
-                msg_type: msg.header.msg_type + '_reply',
+                msg_type: msg.header.msg_type.replace(/_request$/, '') + '_reply',
                 msg_id: `${this.seq++}`,
                 ref_id: msg.header.msg_id,
             },
@@ -395,7 +404,7 @@ export class BaseConnection {
     queue: [Message, Transferable[]][] = [];
     protected _status: ConnectionStatus = 'starting';
     connectHandlers = new Map<string, (conn: Connection, info: Payload) => void>();
-    disconnectHandler = new Map<string, (conn: Connection) => void>();
+    disconnectHandlers = new Map<string, (conn: Connection) => void>();
     channels: string[];
     constructor(public router: typeof Messaging, public id: string, ...channels: string[]) {
         this.deliverHost = router.connect(this, ...channels);
@@ -404,10 +413,18 @@ export class BaseConnection {
     public get status(): ConnectionStatus {
         return this._status;
     }
+    reinit() {
+        this.router.disconnect(this);
+        this.deliverHost = this.router.connect(this, ...this.channels);
+    }
     close() {
+        console.log('close:', this);
         this.router.disconnect(this, ...this.channels);
         this._status = 'closed';
         this.deliverHost = undefined;
+        this.disconnectHandlers.forEach((handler) => queueMicrotask(() => handler(this)));
+        this.connectHandlers.clear();
+        this.disconnectHandlers.clear();
     }
     enqueue = (msg: Message, ...buffers: Transferable[]): void => {
         this.queue.push([msg, buffers]);
@@ -443,11 +460,11 @@ export class BaseConnection {
         disconnectHandler: (conn: Connection) => void,
     ): void {
         this.connectHandlers.set(owner, connectHandler);
-        this.disconnectHandler.set(owner, disconnectHandler);
+        this.disconnectHandlers.set(owner, disconnectHandler);
     }
     removeHandlers(owner: string): void {
         this.connectHandlers.delete(owner);
-        this.disconnectHandler.delete(owner);
+        this.disconnectHandlers.delete(owner);
     }
     send(msg: Message): void | Promise<void | Payload> {
         throw new MessagingError('Function not implemented', msg);

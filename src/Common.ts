@@ -103,6 +103,9 @@ export function upgradeElements(eltDef: typeof BorbElement) {
         });
         newElt.replaceChildren(...oldElt.childNodes);
         console.log('replacedChildren:', newElt.children);
+        if (typeof newElt['upgrade'] == 'function') {
+            newElt['upgrade'].bind(newElt)(oldElt);
+        }
         oldElt.parentElement.replaceChild(newElt, oldElt);
     }
 }

@@ -489,9 +489,11 @@ const openText = async (
  *  Returns a promise that will be satisfied when all saves are complete. */
 const saveAll = () => {
     return Promise.all(
-        [...document.querySelectorAll<BorbEditor>(`${BorbEditor.tag}`)].map((ed) =>
-            ed.save({ all: true }),
-        ),
+        [...document.querySelectorAll<BorbEditor>(`${BorbEditor.tag}`)].map((ed) => {
+            //console.log('saving', ed);
+            ed.save({ all: true });
+            //console.log('saved', ed);
+        }),
     );
 };
 /** Perform an *autoSave()* on all editors in the document. Returns a promise that will be satisfied when all saves are complete. */

@@ -382,6 +382,7 @@ export class BorbFrame extends BorbBaseElement {
         const tab = this._tabs.get(elt);
         if (tab) {
             tab.select();
+            if (this.classList.contains('focused')) tab.element.focus();
             this.tabTransition();
             return true;
         } else {
@@ -546,7 +547,13 @@ export class BorbPanelBuilder<T extends HTMLElement = HTMLElement> {
         }
         return this;
     }
-
+    get panelElement(): T {
+        return this._panel;
+    }
+    id(id: string): this {
+        this._id = id;
+        return this;
+    }
     select(): this {
         this._select = true;
         return this;
@@ -555,22 +562,32 @@ export class BorbPanelBuilder<T extends HTMLElement = HTMLElement> {
         this._title = title;
         return this;
     }
-    panel<U extends HTMLElement = T>(panel: string, id?: string): BorbPanelBuilder<U>;
-    panel<U extends HTMLElement>(panel: U): BorbPanelBuilder<U>;
-    panel<U extends HTMLElement>(panel: U | string, id?: string): BorbPanelBuilder<U> | this {
-        if (typeof panel === 'string') {
-            if (id) {
-                this._id = id;
-                this._panel = document.getElementById(id) as T;
-                if (this._panel) return this;
-            }
-            this._panel = document.createElement(panel) as T;
-            return this;
-        } else {
-            const builder = this as unknown as BorbPanelBuilder<U>;
+    //panel<U extends HTMLElement = T>(panel: string, id?: string): BorbPanelBuilder<U>;
+    //    panel<U extends HTMLElement>(panel: U): BorbPanelBuilder<U>;
+    panel<U extends HTMLElement = T>(
+        panel: U | string | (new () => U),
+        id?: string,
+    ): BorbPanelBuilder<U> {
+        const builder = this as unknown as BorbPanelBuilder<U>;
+        if (panel instanceof HTMLElement) {
+            console.log('htmlelement:', panel);
             builder._panel = panel;
+            if (id) panel.id = id;
             return builder;
         }
+        if (id) {
+            builder._id = id;
+            builder._panel = document.getElementById(id) as U;
+            if (this._panel) return builder;
+        }
+        if (typeof panel === 'string') {
+            builder._panel = document.createElement(panel) as U;
+        } else if (typeof panel === 'function') {
+            const builder = this as unknown as BorbPanelBuilder<U>;
+            builder._panel = new panel();
+        }
+        if (id) builder._panel.id = id;
+        return builder;
     }
 
     get strict(): this {
