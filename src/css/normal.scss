@@ -1,0 +1,85 @@
+#page {
+    min-height: 100vh;
+    min-width: 100vw;
+    width: 100vw;
+
+    display: grid;
+    //	grid-template-rows: $head-height calc(50% - #{$head-height}) calc(50% - #{$foot-height}) $foot-height;
+    grid-template-columns: 100%;
+    grid-template-rows: $head-height calc(100% - #{$head-height} - #{$foot-height}) $foot-height;
+    //	grid-template-rows: $head-height repeat(12, calc((100% - #{$head-height} - #{$foot-height}) / 12)) $foot-height;
+    overflow: hidden;
+
+    @include for-desktop-up {
+        height: 100vh;
+    }
+}
+
+#page.login {
+    height: auto;
+}
+
+#page.mainly-coding,
+#page.mainly-figure {
+    grid-template-rows: $head-height calc(75% - #{$head-height}) calc(25% - #{$foot-height}) $foot-height;
+}
+
+#top {
+    grid-column: 1/-1;
+    grid-row: 1/2;
+}
+
+#mid {
+    grid-column: 1/-1;
+    grid-row: 2/-2;
+
+    @include for-tablet-landscape-up {
+        max-height: 200vh;
+        display: grid;
+        grid-template-columns: repeat(32, calc(99% / 32));
+        grid-template-rows: repeat(16, calc(99% / 16));
+    }
+
+}
+
+#bottom {
+    grid-column: 1/-1;
+    grid-row: -2/-1;
+}
+
+.explorer {
+    grid-column: 1/4;
+    grid-row: 1/-1;
+}
+
+#editor {
+    grid-column: 4/19;
+    grid-row: 1/8;
+}
+
+#screen {
+    grid-column: 19/-1;
+    grid-row: 1/8;
+}
+
+#shell {
+    grid-column: 4/-1;
+    grid-row: 8/-1;
+}
+
+#page.login {
+    grid-template-rows: $head-height calc(100% - #{$head-height+$foot-height}) $foot-height;
+}
+
+#login.box {
+    grid-column: 7/-1;
+    grid-row: 2/-2;
+    padding: 1rem;
+
+}
+
+#terms.box {
+    grid-column: 2/7;
+    grid-row: 2/-2;
+    padding: 1rem;
+}

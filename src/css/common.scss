@@ -1,0 +1,221 @@
+@import 'colors.scss';
+
+
+// GLOBAL
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+
+// LINKS
+
+a:link {
+    text-decoration: none;
+    color: var(--text-fg-link);
+}
+
+a:visited {
+    text-decoration: none;
+    color: var(--text-fg-visited);
+}
+
+a:hover,
+a:active {
+    text-decoration: underline;
+    color: var(--text-fg-hover);
+}
+
+// TEXT
+p {
+    color: var(--text-fg);
+}
+
+// MARGINS
+p,
+dl,
+multicol {
+    margin-block-start: .5em;
+    margin-block-end: .2em;
+}
+
+div.stack-frames {
+    color: #bbc;
+    padding: 0;
+    padding-bottom: .25rem;
+    margin-bottom: .25rem;
+    border-bottom: .125rem solid;
+
+    h1 {
+        padding: .5rem;
+        font-size: 1.4rem;
+        font-weight: bold;
+        ;
+    }
+}
+
+.stack-frame {
+
+    h2 {
+        margin: 0;
+        padding: .5rem;
+        background-color: #bbc;
+        color: #333;
+    }
+
+    .address,
+    .vars {
+        display: grid;
+        grid-template-rows: repeat(auto-fit, 2rem);
+
+        &>* {
+            padding: 0 0.2rem;
+        }
+    }
+
+    .vars {
+        grid-template-columns: repeat(4, auto);
+        text-align: left;
+    }
+
+    .address {
+        grid-template-columns: 6rem;
+        text-align: right;
+
+    }
+
+    .memory {
+        display: grid;
+        grid-template-columns: repeat(8, 2rem) repeat(4, auto);
+        grid-template-rows: repeat(auto-fit, 2rem);
+        line-height: 2rem;
+        margin-left: 2rem;
+        width: max-content;
+
+        .head {
+            font-weight: 500;
+        }
+
+        // .name {
+        //     text-align: left
+        // }
+
+        // .type,
+        // .size,
+        // .kind {
+        // }
+        .offset,
+        .size {
+            text-align: right;
+        }
+
+        .name,
+        .type,
+        .kind {
+            text-align: left;
+        }
+
+        .offset,
+        .name,
+        .type,
+        .size,
+        .kind {
+            height: 2rem;
+            padding: 0 .5rem;
+        }
+
+        .offset {
+            padding-left: .75rem;
+        }
+
+        .byte {
+            //width: 2rem;
+            height: 2rem;
+            border: none;
+            //  border: 1px solid #484;
+            position: relative;
+            display: block;
+
+            &[data-pos="0"]::before {
+                content: attr(data-offset);
+                position: absolute;
+                font-size: .8rem;
+                left: -.25rem;
+                line-height: normal;
+                transform: translateX(-100%);
+            }
+
+
+            &.bg-p,
+            &.bg-0,
+            &.bg-1,
+            &.bg-2,
+            &.bg-3 {
+                background-image: linear-gradient(90deg, #0008 0%, #0000 5%, #0000 95%, #0008 100%), linear-gradient(0deg, #0008 0%, #0000 5%, #0000 95%, #0008 100%);
+                background-size: 2rem 2rem;
+
+            }
+
+
+
+            &.bg-p {
+                background-color: #666;
+                //background-image: linear-gradient(135deg, #888 12.5%, rgba(0, 0, 0, 0) 12.5%, rgba(0, 0, 0, 0) 50%, #888 50%, #888 62.5%, rgba(0, 0, 0, 0) 62.5%, rgba(0, 0, 0, 0) 100%);
+                //                background-image: linear-gradient(135deg, #888888 25%, #0000 25%, #0000 50%, #888888 50%, #888888 75%, #0000 75%, #0000 100%);
+                //background-size: 28.28px 28.28px;
+            }
+        }
+
+        span.hex {
+            display: none;
+        }
+
+    }
+
+
+
+    .bg-0 {
+
+        background-color: hsl(60, 50%, 25%);
+    }
+
+    .bg-3 {
+        background-color: hsl(240, 50%, 25%);
+    }
+
+    .bg-2 {
+        background-color: hsl(300, 50%, 25%);
+    }
+
+    .bg-1 {
+        background-color: rgb(96, 32, 32);
+    }
+
+    td,
+    th {
+        padding: .25rem;
+        border: 1px solid;
+    }
+}
+
+.stack-frames .hex .memory,
+.stack-frames.hex .memory,
+.stack-frames .hex.memory {
+    .byte[data-pos="0"]::before {
+        content: attr(data-offset-x)
+    }
+
+    span.hex {
+        display: inline
+    }
+
+    span.dec {
+        display: none
+    }
+}
+
+// :host {
+//     @include dark-background;
+// }

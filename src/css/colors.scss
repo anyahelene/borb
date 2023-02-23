@@ -1,0 +1,152 @@
+@use "sass:map";
+@use "sass:color";
+@use "sass:math";
+@use "sass:string";
+@use "sass:meta";
+
+$PHOSPHOR_P1: #4aff00; // ~525nm
+$PHOSPHOR_P19: #ffdf00; // ~590nm
+
+$color-scheme: (
+	"frame": ('=', #aab),
+	"focused": ('=', #eea),
+	"selected": ('+', 17),
+	"half": ('*', .5),
+	"pen": ('=', #333),
+	"faded": ('*', 2),
+	"fade-80": ('#', .8),
+	"fade-50": ('#', .5),
+	"defocus": ('*', .8)
+);
+$water: #66e;
+$page: #ccd;
+$page-light: #eeeaea;
+$frame: #ccd;
+$frame-accent: color.adjust($page, $hue: 180);
+$pen: #222;
+$pen-sharp: #000;
+$prompt: #fa6;
+$prompt-half: #880;
+$terminal: $PHOSPHOR_P1;
+$terminal-half: $PHOSPHOR_P19;
+$terminal-alt: $PHOSPHOR_P19;
+$sun: color.adjust($page, $hue: 180);
+$button-bg-header: color.scale($page, $lightness: -20%);
+$button-bg-normal: color.scale($sun, $lightness: -20%);
+$button-bg-hover: color.scale($sun, $lightness: +10%);
+$button-bg-active: color.scale($sun, $lightness: -40%);
+$border-active: $pen-sharp;
+$border: $pen;
+$bgdark: #111;
+$bglight: #eee;
+
+$LIGHT_BLUE: rgb(50%, 50%, 100%);
+$BLUE: rgb(0%, 0%, 100%);
+$OLIVE: rgb(50%, 50%, 0%);
+$MAROON: rgb(50%, 0%, 0%);
+
+
+$debug: $LIGHT_BLUE;
+$info: $BLUE;
+$warning: #ff0;
+$error: #f00;
+
+
+@mixin dark-background {
+	background-color: var(--main-bg-color-dark);
+	background-image: var(--main-bg-image-dark);
+	background-size: 100vw 100vh;
+	background-attachment: fixed;
+	background-blend-mode: screen;
+
+	color: $terminal;
+
+	a:link {
+		color: #9abaff;
+	}
+
+	a:visited {
+		color: #ba9aff;
+	}
+
+	a:hover {
+		color: #ff8a4a;
+	}
+}
+
+@mixin light-background {
+	background-color: var(--main-bg-image-light);
+	background-image: var(--main-bg-image-light);
+	background-size: 100vw 100vh;
+	background-attachment: fixed;
+	color: $pen-sharp;
+
+}
+
+
+@function replace($string, $search, $replace) {
+	@if $string ==$search {
+		@return $replace;
+	}
+	@else {
+		$i: string.index($string, $search);
+		$l: string.length($search);
+		@return string.slice($string, 1, ($i)-1)+$replace+string.slice($string, $i+$l, -1);
+	}
+}
+
+@function color-lookup($specs...) {
+	$add: 0;
+	$mul: 1;
+	$c: #888;
+	$base_color: #888;
+	$cs: ' &';
+	$base: 'color';
+
+	@each $spec in $specs {
+		@if meta.type-of($spec)=='color' {
+			$c: $spec;
+			$base_color: $spec;
+			$base: $spec;
+		}
+		@else {
+			$cmd: nth(map.get($color-scheme, $spec), 1);
+			$arg: nth(map.get($color-scheme, $spec), 2);
+
+			@if $cmd =='=' {
+				$c: $arg;
+				$base_color: $arg;
+				$base: $spec;
+			}
+		}
+	}
+
+	@each $spec in $specs {
+		$cmd: nth(map.get($color-scheme, $spec), 1);
+		$arg: nth(map.get($color-scheme, $spec), 2);
+
+		@if $cmd =='+' {
+			$c: color.change($c, $red: color.red($c)+$arg, $green: color.green($c)+$arg, $blue: color.blue($c)+$arg);
+			$cs: '(#{$cs} + #{$arg})';
+		}
+
+		@else if $cmd =='*' {
+			$c: color.change($c, $red: color.red($c)*$arg, $green: color.green($c)*$arg, $blue: color.blue($c)*$arg);
+			$cs: '(#{$cs} * #{$arg})';
+		}
+
+		@else if $cmd =='#' {
+			$c: color.change($c, $alpha: color.alpha($c)*$arg);
+			// todo
+		}
+	}
+
+	//@error $cs;
+	$cs: 'rgb(calc(#{replace($cs, ' &', ' var(--#{$base}-r, #{color.red($base_color)})')}), calc(#{replace($cs, ' &', ' var(--#{$base}-g, #{color.green($base_color)})')}), calc(#{replace($cs, ' &', ' var(--#{$base}-b, #{color.blue($base_color)})')}))';
+	//$cs: 'calc'+string.slice($cs, 1, string.index($cs, '&')-1)+'var(--'+$base+')'+string.slice($cs, string.index($cs, '&')+1, -1);
+	@return $c; // string.unquote($cs);
+}
+
+@function rgbMul($base, $factor) {
+	@return rgb(calc(var(#{$base}-r)#{$factor}), calc(var(#{$base}-g)#{$factor}), calc(var(#{$base}-b)#{$factor}))
+}

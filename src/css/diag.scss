@@ -1,0 +1,98 @@
+.diag p,
+.diag ul {
+    margin: .5rem 0;
+}
+
+.with-diag-none {
+    background: linear-gradient(45deg, #0201 0%, #020 100%) //border-color: $debug !important
+}
+
+.with-diag-none .cm-line {
+    background: #5f01;
+}
+
+.with-diag-debug {
+    background: linear-gradient(45deg, #1121 0%, #112 100%) //border-color: $debug !important
+}
+
+.with-diag-info {
+    background: linear-gradient(45deg, #0021 0%, #002 100%) //	border-color: $info !important
+}
+
+.with-diag-warning {
+    background: linear-gradient(45deg, #2201 0%, #220 100%) //	border-color: $warning !important
+}
+
+.with-diag-error {
+    background: linear-gradient(45deg, #2001 0%, #200 100%) //	border-color: $error !important
+}
+
+.with-diag-error .cm-line {
+    background: #f001;
+}
+
+.diag-debug {
+    color: $debug
+}
+
+.diag-info,
+.diag-code {
+    color: $terminal
+}
+
+.diag-warning {
+    color: $warning
+}
+
+.diag-error {
+    color: $error
+}
+
+.diag-code {
+    padding-left: 2rem;
+}
+
+.diag-between {
+    border-width: .2rem .7rem .2rem 0;
+    border-style: solid;
+    margin-right: -.7rem
+}
+
+.diag-message {
+    //	padding-left: 1rem;
+}
+
+ul.traceback {
+    padding: 0;
+    list-style: none;
+}
+
+ul.fold>li:first-child::before {
+    content: "⯈";
+    left: 0;
+    margin-left: 1rem;
+    position: absolute;
+    transition: transform ease-in-out .5s;
+}
+
+ul.fold.open>li:first-child::before {
+    transform: rotate(90deg);
+}
+
+ul.fold.open>li:first-child:hover::before {
+    transform: rotate(90deg) scale(1.2)
+}
+
+ul.fold>li:first-child:hover::before {
+    transform: scale(1.2)
+}
+
+ul.fold>li {
+    display: none;
+    position: relative;
+}
+
+ul.fold>li:first-child,
+ul.fold.open>li {
+    display: block;
+}

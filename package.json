@@ -77,5 +77,8 @@
         "singleQuote": true,
         "trailingComma": "all",
         "tabWidth": 4
+    },
+    "dependencies": {
+        "path-browserify": "^1.0.1"
     }
 }

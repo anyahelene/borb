@@ -3,12 +3,25 @@ const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 
 const config = {
   target: 'web',
+  context: path.resolve(__dirname, './src'),
   entry: {
-    index: './src/index.ts',
+    index: './index.ts',
+    css: { 
+        import: [
+                './css/common.scss',
+                './css/editor.scss',
+                './css/buttons.scss',
+                './css/frames.scss',
+                './css/markdown.scss',
+                './css/terminal.scss',
+                './css/grid-display.scss',
+        ],
+ //       filename: '[path][name].[ext]',
+    }
   },
   output: {
     path: path.resolve(__dirname, './dist'),
-    filename: 'index.js',
+//    filename: 'index.js',
     library: 'borb',
     libraryTarget: 'umd',
     globalObject: 'this',
@@ -40,10 +53,11 @@ const config = {
       },
       {
         test: /\.s?css$/,
+        type: 'asset/resource',
+          generator: {
+              filename: '[path][name].css'
+          },
         use: [
-          'style-loader',
-          'css-loader',
-          'postcss-loader',
           {
             loader: 'sass-loader',
             options: { implementation: require('sass') },
@@ -54,6 +68,7 @@ const config = {
   },
   resolve: {
     extensions: ['.tsx', '.ts', '.js'],
+    fallback: { path: 'path-browserify' },
   },
 };
 

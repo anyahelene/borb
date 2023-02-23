@@ -1,0 +1,151 @@
+@use "sass:color";
+@import 'breakpoints.scss';
+@import 'colors.scss';
+@import 'diag.scss';
+
+:host {
+    opacity: 100%;
+    transition: none 1s cubic-bezier(.6, -0.28, .74, .05);
+    min-width: 0;
+    min-height: 0;
+    max-height: 100%;
+    max-width: 100%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: stretch;
+    overflow-anchor: none;
+
+    &[hidden] {
+        display: none;
+    }
+
+    width: 100%;
+    font-size: 1.4rem;
+    color: var(--text-fg);
+}
+
+:host(.focused) .cm-cursor {
+    border-left-color: #f00;
+}
+
+.terminal-in {
+    height: auto;
+    max-height: 70%;
+    border-top: 0.1rem solid;
+    border-color: inherit;
+
+    .cm-editor {
+        @include for-tablet-landscape-up {
+            height: 100%;
+        }
+    }
+
+}
+
+
+.terminal-out-container {
+    @include for-tablet-landscape-up {
+        overflow-y: auto;
+    }
+
+    flex-grow:1;
+    display: flex;
+    flex-direction: column-reverse;
+}
+
+.terminal-out {
+    white-space: pre-wrap;
+    word-break: break-all;
+    padding: .2rem .5rem;
+}
+
+.terminal-out .block {
+    border-top: .1rem dashed #6866;
+    padding: .2rem .5rem;
+    margin-top: .2rem;
+}
+
+
+.cm-editor .cm-line:first-child::before {
+    content: "›››  "; //"〉"
+}
+
+.cm-editor .cm-line::before {
+    content: "...  "; //"〉"
+    letter-spacing: -.5rem;
+    opacity: 1;
+    transition: opacity 1.5s;
+    margin-left: -.5rem;
+}
+
+:host([status="running"]) .cm-editor .cm-line::before,
+:host([status="waiting"]) .cm-editor .cm-line::before,
+:host([status="waiting"]) .cm-editor .cm-line:first-child::before {
+    transition: opacity 0s;
+    opacity: 0;
+}
+
+:host([status="waiting"]) .cm-cursor {
+    border-left-color: #300;
+}
+
+:host([status="running"]) .cm-cursor {
+    border-left-color: #030;
+}
+
+.terminal-anchor {
+    overflow-anchor: auto;
+    height: 1px;
+}
+
+.terminal-out .prompt {
+    margin-left: -.2rem;
+    color: $prompt-half;
+    margin-right: .2rem;
+}
+
+.terminal-out .diag {
+    border-left: .2rem solid currentcolor;
+    padding-left: .3rem;
+    margin-left: -.5rem;
+    white-space: normal;
+}
+
+.terminal-out .diag-code {
+    white-space: pre-wrap;
+}
+
+.eval-result img {
+    max-height: 1.1em; // *em*, since it should relative to local font size
+    margin: .1em .2rem;
+    vertical-align: middle;
+}
+
+.eval-result img:hover {
+    max-height: auto; // *em*, since it should relative to local font size
+    margin: .1em .2rem;
+    vertical-align: middle;
+}
+
+.file-list td {
+    padding: 0 .5rem;
+}
+
+.file-list td.file-mode {
+    padding-left: 0;
+}
+
+.file-list td.file-size {
+    text-align: right;
+    min-width: 4rem;
+}
+
+.file-list td.file-name {
+    text-align: left
+}
+
+.command span {
+    background-color: #ffffff11;
+    padding: .2rem;
+}

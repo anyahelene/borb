@@ -1,0 +1,152 @@
+//@import 'mixins.scss';
+@import 'breakpoints.scss';
+
+:host {
+    position: relative;
+    display: inline-block;
+
+    &[hidden] {
+        display: none;
+    }
+}
+
+:host(.rows) button {
+    background: #f00;
+}
+
+:host(.not-implemented) {
+    display: none;
+
+    @include for-desktop-up {
+        display: inline-block;
+    }
+}
+
+
+button {
+    background: inherit;
+    color: inherit;
+    font: inherit;
+    border: none;
+    line-height: 100%;
+    padding: 0 .2rem;
+    //transition: all 0.8s;
+    width: 100%;
+    height: 100%;
+    //@include pixel-font;
+    font-size-adjust: none;
+}
+
+button:focus-visible,
+[type="button"]:focus-visible {
+    outline: 1px auto;
+}
+
+:host(.disappear) button .text,
+:host(.disappear) button .icon {
+    font-size: 0;
+    transition: font-size 2s;
+}
+
+:host(.disabled) button {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+button:active {
+    background-color: #0f0;
+}
+
+button.has-text {
+    text-align: end;
+}
+
+button.no-text {
+    text-align: center;
+
+    .text {
+        display: none;
+    }
+}
+
+button.no-icon .icon {
+    display: none;
+}
+
+button .text,
+button.no-text .icon {
+    position: relative;
+}
+
+button:hover .text {
+    z-index: 13;
+    top: .4rem;
+}
+
+button .icon {
+    z-index: 2;
+    text-shadow: 0 0 .2rem;
+    transition: font-size .3s;
+    font-size: 1rem;
+    vertical-align: baseline;
+}
+
+button.has-text .icon {
+    position: absolute;
+    width: max-content;
+    right: calc(100% - 1.2rem);
+    top: 50%;
+    transform: translate(0, -50%);
+}
+
+button:hover .icon {
+    z-index: 12;
+    font-size: 1.5rem;
+}
+
+button.no-text .icon {
+    font-size: 1.4rem;
+}
+
+button .bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+}
+
+button:hover .bg {
+    background-color: inherit;
+    left: -.5rem;
+    top: -.2rem;
+    width: calc(100% + .5rem);
+    height: calc(100% + .6rem);
+    z-index: 9;
+    box-shadow: 0 0 .2rem black;
+}
+
+button .shortcut {
+    display: none;
+    opacity: 0%;
+    position: absolute;
+    width: max-content;
+    top: -.2rem;
+    right: 0.2rem;
+    z-index: 2;
+    //@include normal-font;
+    font-size-adjust: none;
+    transition: font-size .3s, opacity .3s;
+    line-height: 1rem;
+}
+
+button .shortcut span {
+    text-align: middle
+}
+
+button:hover .shortcut {
+    display: block;
+    opacity: 100%;
+    z-index: 12;
+}
