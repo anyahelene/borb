@@ -1,6 +1,19 @@
 @import 'colors.scss';
 
-
+/*
+body,
+:host {
+    --frame-text: #{color-lookup(pen)};
+    --frame-text-faded: #{color-lookup(pen, faded)};
+    --frame-border-focused: #{color-lookup(focused)};
+    --frame-header: #{color-lookup(frame, fade-50)};
+    --frame-header-focused: #{color-lookup(frame, focused, fade-50)};
+    --frame-tab: #{color-lookup(frame, defocus)};
+    --frame-tab-focused: #{color-lookup(frame, focused, defocus)};
+    --frame-tab-selected: #{color-lookup(frame, selected)};
+    --frame-tab-focused-selected: #{color-lookup(frame, focused, selected)};
+}
+*/
 // GLOBAL
 
 *,
@@ -127,7 +140,15 @@ div.stack-frames {
         }
 
         .offset {
-            padding-left: .75rem;
+            padding-left: 2.75rem;
+
+            .hex {
+                display: inline;
+            }
+
+            .dec {
+                display: none;
+            }
         }
 
         .byte {
@@ -172,31 +193,47 @@ div.stack-frames {
             display: none;
         }
 
+
     }
 
 
 
-    .bg-0 {
 
-        background-color: hsl(60, 50%, 25%);
-    }
-
-    .bg-3 {
-        background-color: hsl(240, 50%, 25%);
-    }
-
-    .bg-2 {
+    .bg-5 {
         background-color: hsl(300, 50%, 25%);
     }
 
+    .bg-4 {
+        background-color: hsl(240, 50%, 25%);
+    }
+
+    .bg-3 {
+        background-color: hsl(180, 50%, 25%);
+    }
+
+    .bg-2 {
+        background-color: hsl(120, 50%, 25%);
+    }
+
     .bg-1 {
-        background-color: rgb(96, 32, 32);
+        background-color: hsl(60, 50%, 25%);
+    }
+
+    .bg-0 {
+        background-color: hsl(0, 50%, 25%);
     }
 
     td,
     th {
         padding: .25rem;
         border: 1px solid;
+    }
+
+    .prev-frame {
+        clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 100% 65%, 97% 70%, 92% 67%, 86% 93%, 78% 65%, 75% 94%, 72% 63%, 66% 93%, 63% 60%, 60% 99%, 54% 79%, 47% 81%, 42% 73%, 36% 88%, 29% 69%, 25% 95%, 21% 60%, 16% 94%, 8% 66%, 2% 98%, 0% 100%);
+        text-align: center;
+        background-color: #666;
+        height: 120%;
     }
 }
 

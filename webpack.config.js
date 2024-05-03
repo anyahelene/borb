@@ -14,6 +14,7 @@ const config = {
                 './css/frames.scss',
                 './css/markdown.scss',
                 './css/terminal.scss',
+                './css/sheet.scss',
                 './css/grid-display.scss',
         ],
  //       filename: '[path][name].[ext]',

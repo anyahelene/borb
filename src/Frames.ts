@@ -61,7 +61,16 @@ dragImage.style.background = 'none';
 //const dragImage = (html.node`<img width="0" height="0" style="background:green!important;opacity:0%" id="transparent-pixel" src="">`;
 
 const nameAttrs = new Map<string, string[]>([
-    ['tab-title', ['tab-title', 'data-tab-title', 'frame-title', 'data-title', 'data-frame-title']],
+    [
+        'tab-title',
+        [
+            'tab-title',
+            'data-tab-title',
+            'frame-title',
+            'data-title',
+            'data-frame-title',
+        ],
+    ],
     ['title-left', ['title-left']],
     ['title-right', ['title-right', 'status']],
     ['title-mid', ['title-mid']],
@@ -102,7 +111,9 @@ class TabEntry extends HTMLButtonElement {
         this.observer.observe(this.element, {
             attributeFilter: this.nameAttrList,
         });
-        this.element.slot = this.frame.classList.contains('no-tabs') ? '' : this.element.id;
+        this.element.slot = this.frame.classList.contains('no-tabs')
+            ? ''
+            : this.element.id;
         if (!this.panel.hasAttribute('role')) {
             this.panel.setAttribute('role', 'tabpanel');
         }
@@ -206,7 +217,10 @@ class TabEntry extends HTMLButtonElement {
     }
 
     isLeftOf(other: HTMLElement): boolean {
-        return this.parentElement === other.parentElement && this.offsetLeft < other.offsetLeft;
+        return (
+            this.parentElement === other.parentElement &&
+            this.offsetLeft < other.offsetLeft
+        );
     }
 
     get tag() {
@@ -248,14 +262,20 @@ export class BorbFrame extends BorbBaseElement {
         this._overlay.style.pointerEvents = 'none';
         this._header.dataset.drop = 'true';
         this._header.addEventListener('borbdragenter', (ev: BorbDragEvent) => {
-            if (ev.dragSource instanceof TabEntry && ev.dragSource.canDropTo(this)) {
-                if (BorbFrame._debug) console.log('FRAME enter', this.frameName, ev.target, ev);
+            if (
+                ev.dragSource instanceof TabEntry &&
+                ev.dragSource.canDropTo(this)
+            ) {
+                if (BorbFrame._debug)
+                    console.log('FRAME enter', this.frameName, ev.target, ev);
                 ev.allowDrop('move');
                 if (ev.target === ev.dragSource) {
                     // do nothing
                 } else if (ev.target instanceof TabEntry) {
                     ev.target.insertAdjacentElement(
-                        ev.dragSource.isLeftOf(ev.target) ? 'afterend' : 'beforebegin',
+                        ev.dragSource.isLeftOf(ev.target)
+                            ? 'afterend'
+                            : 'beforebegin',
                         ev.dragSource,
                     );
                 } else {
@@ -265,21 +285,32 @@ export class BorbFrame extends BorbBaseElement {
         });
         this._header.addEventListener('borbdragleave', (ev: BorbDragEvent) => {
             if (ev.dragSource instanceof TabEntry && !ev.newTarget) {
-                if (BorbFrame._debug) console.log('FRAME leave', this.frameName, ev.target, ev);
+                if (BorbFrame._debug)
+                    console.log('FRAME leave', this.frameName, ev.target, ev);
                 ev.dragState.cancelDropAttempt();
             }
         });
         this._header.addEventListener('borbdrop', (ev: BorbDragEvent) => {
             if (ev.dragSource instanceof TabEntry) {
                 if (BorbFrame._debug)
-                    console.log('FRAME drop', this.frameName, ev.target, ev.dragSource, ev, this);
+                    console.log(
+                        'FRAME drop',
+                        this.frameName,
+                        ev.target,
+                        ev.dragSource,
+                        ev,
+                        this,
+                    );
                 const nextElement = ev.dragSource.nextTabEntryElement();
                 if (nextElement) {
                     assert(
                         nextElement !== ev.dragSource.element,
                         'nextElement !== ev.dragSource.element',
                     );
-                    nextElement.insertAdjacentElement('beforebegin', ev.dragSource.element);
+                    nextElement.insertAdjacentElement(
+                        'beforebegin',
+                        ev.dragSource.element,
+                    );
                     ev.acceptDrop('move');
                 } else {
                     this.appendChild(ev.dragSource.element);
@@ -313,7 +344,9 @@ export class BorbFrame extends BorbBaseElement {
     }
     get frameName(): string {
         const title = interpolate(
-            this.hasAttribute('frame-title') ? this.getAttribute('frame-title') : this.id,
+            this.hasAttribute('frame-title')
+                ? this.getAttribute('frame-title')
+                : this.id,
             {},
         );
         return `${title}${this.selected ? ':' + this.selected.tabName : ''}`;
@@ -332,11 +365,15 @@ export class BorbFrame extends BorbBaseElement {
         this._tabs.forEach((tab) => tab.selected(tab === this.selected));
         //if(BorbFrame._debug) console.log("render", this, this, this.isConnected, this.shadowRoot, frameTitle, dh, minIcon, maxIcon);
         try {
-            const title = this.selected?.titleAttrs['title-left'] ?? this.frameTitle ?? '';
+            const title =
+                this.selected?.titleAttrs['title-left'] ??
+                this.frameTitle ??
+                '';
             render(
                 this._header.querySelector('h1'),
-                html`<span class="title-left">${title}</span>${this.selected?.titleElts.mid ??
-                    ''}${this.selected?.titleElts.right ?? ''}`,
+                html`<span class="title-left">${title}</span>${this.selected
+                        ?.titleElts.mid ?? ''}${this.selected?.titleElts
+                        .right ?? ''}`,
             );
             render(
                 this.shadowRoot,
@@ -354,7 +391,8 @@ export class BorbFrame extends BorbBaseElement {
     }
     newTab(elt: HTMLElement): TabEntry {
         const entry = new TabEntry().init(elt, this);
-        if (BorbFrame._debug) console.log('Frames:', this.frameName, 'adding tab', entry);
+        if (BorbFrame._debug)
+            console.log('Frames:', this.frameName, 'adding tab', entry);
         this._tabs.set(elt, entry);
         return entry;
     }
@@ -362,12 +400,24 @@ export class BorbFrame extends BorbBaseElement {
         const entry = this._tabs.get(elt);
         if (entry) {
             if (BorbFrame._debug)
-                console.log('Frames:', this.frameName, 'removing tab', entry, entry.element);
+                console.log(
+                    'Frames:',
+                    this.frameName,
+                    'removing tab',
+                    entry,
+                    entry.element,
+                );
             if (entry.parentElement === this._nav) entry.dispose();
             this._tabs.delete(elt);
         } else {
             if (BorbFrame._debug)
-                console.log('Frames:', this.frameName, 'tab removed', entry, entry.element);
+                console.log(
+                    'Frames:',
+                    this.frameName,
+                    'tab removed',
+                    entry,
+                    entry.element,
+                );
         }
     }
 
@@ -404,10 +454,12 @@ export class BorbFrame extends BorbBaseElement {
         const lastSelected = this.selected;
         const removedChildren = new Set(this._tabs.keys());
         const before = [...this._nav.children];
-        if (BorbFrame._debug) console.log('updateChildren', this.frameName, 'before', before);
+        if (BorbFrame._debug)
+            console.log('updateChildren', this.frameName, 'before', before);
         this._nav.replaceChildren();
         for (const elt of this.children) {
-            if (['HEADER', 'FOOTER', 'ASIDE'].indexOf(elt.tagName) >= 0) continue;
+            if (['HEADER', 'FOOTER', 'ASIDE'].indexOf(elt.tagName) >= 0)
+                continue;
             if (elt instanceof HTMLElement) {
                 removedChildren.delete(elt);
                 const entry = this._tabs.get(elt) ?? this.newTab(elt);
@@ -418,7 +470,8 @@ export class BorbFrame extends BorbBaseElement {
             }
         }
         const after = [...this._nav.children];
-        if (BorbFrame._debug) console.log('updateChildren', this.frameName, 'after', after);
+        if (BorbFrame._debug)
+            console.log('updateChildren', this.frameName, 'after', after);
         removedChildren.forEach((elt) => this.delTab(elt));
         if (selected) this.selected = selected;
         else this.selected = this._nav.children?.[0] as TabEntry;
@@ -467,11 +520,13 @@ export class BorbFrame extends BorbBaseElement {
         this.removeEventListener('focusout', this._focusout, false);
         DragNDrop.detachDropZone(this._header);
         // Styles.detach(styleRef, this._styleChangedHandler);
-        if (BorbFrame._debug) console.log('removed from page.', this.frameName, this);
+        if (BorbFrame._debug)
+            console.log('removed from page.', this.frameName, this);
     }
 
     adoptedCallback() {
-        if (BorbFrame._debug) console.log('moved to new page.', this.frameName, this);
+        if (BorbFrame._debug)
+            console.log('moved to new page.', this.frameName, this);
     }
 
     attributeChangedCallback(name: string, oldValue: string, newValue: string) {
@@ -512,7 +567,15 @@ export class BorbFrame extends BorbBaseElement {
     _focusin(ev: FocusEvent) {
         this.classList.add('focused', 'focusin');
         const last = BorbFrame.currentFocus;
-        if (BorbFrame._debug) console.log('focusin', this.frameName, 'this:', this, 'last:', last);
+        if (BorbFrame._debug)
+            console.log(
+                'focusin',
+                this.frameName,
+                'this:',
+                this,
+                'last:',
+                last,
+            );
         if (last !== this) {
             BorbFrame.currentFocus = this;
             BorbFrame.lastFocus = last;
@@ -536,8 +599,10 @@ export class BorbPanelBuilder<T extends HTMLElement = HTMLElement> {
     private _error: string[] = [];
     private _select: boolean;
     frame(targetFrame: BorbFrame | string): this {
-        let fr =
-            typeof targetFrame === 'string' ? document.getElementById(targetFrame) : targetFrame;
+        const fr =
+            typeof targetFrame === 'string'
+                ? document.getElementById(targetFrame)
+                : targetFrame;
         if (!fr.tagName.startsWith('BORB-FRAME')) {
             const err = `Can't find frame, or not a BorbFrame: ${targetFrame}`;
             this._error.push(err);
@@ -554,8 +619,8 @@ export class BorbPanelBuilder<T extends HTMLElement = HTMLElement> {
         this._id = id;
         return this;
     }
-    select(): this {
-        this._select = true;
+    select(select = true): this {
+        this._select = select;
         return this;
     }
     title(title: string): this {
@@ -598,7 +663,8 @@ export class BorbPanelBuilder<T extends HTMLElement = HTMLElement> {
         if (!this._frame) this._error.push(`no frame specified`);
 
         if (!this._title) this._error.push(`no title specified`);
-        if (this._strict && this._error.length > 0) throw new Error(this._error.join('; '));
+        if (this._strict && this._error.length > 0)
+            throw new Error(this._error.join('; '));
 
         if (!this._panel) this._panel = document.createElement('section') as T;
         if (this._title) this._panel.setAttribute('tab-title', this._title);

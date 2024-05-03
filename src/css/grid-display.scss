@@ -1,6 +1,3 @@
-@use "sass:color";
-@import 'colors.scss';
-
 .grid {
     display: grid;
     width: 100%;
@@ -8,7 +5,7 @@
 }
 
 .grid>div {
-    color: $terminal;
+    color: var(--text-fg);
     position: relative;
     text-align: center;
     border: thin dotted #8881;

@@ -103,8 +103,6 @@
     display: inline-block;
 }
 
-.table-of-contents li a {}
-
 .table-of-contents li a::before {
     content: ">";
     visibility: hidden;
@@ -127,12 +125,12 @@
 .dark .text details,
 .dark .text pre {
     background: #333;
-    color: $terminal-alt;
+    color: var(--text-fg-alt);
 }
 
 .dark .text details pre {
     background: #444;
-    color: $terminal-alt;
+    color: var(--text-fg-alt);
 }
 
 .text details,
@@ -209,7 +207,7 @@ aside.small>figure>img {
 figcaption {
     text-align: left;
     font-size: 0.8rem;
-    color: $terminal-alt;
+    color: var(--text-fg-alt);
 }
 
 .is-wide {
@@ -339,7 +337,7 @@ div>p.first {
 }
 
 .important {
-    color: $terminal-alt;
+    color: var(--text-fg-alt);
 }
 
 aside.important {
@@ -362,7 +360,7 @@ div.for-intermediate,
 div.for-advanced {
     margin: .2rem 0;
     padding: .2rem;
-    border-left: .2rem solid #4dff0088;
+    border-left: .2rem solid var(--text-fg-alt);
 }
 
 .beginner-mode div.for-beginner,
@@ -414,11 +412,11 @@ aside.tip,
 aside.important {
     background: #333;
     margin: .2rem;
-    border: 0.1rem solid #4dff0088;
+    border: 0.1rem solid var(--text-fg-alt);
     padding: .5rem;
 }
 
 code {
-    color: #ffdf00;
+    color: var(--code-fg);
     font-family: inherit
 }

@@ -1,6 +1,3 @@
-@use "sass:color";
-@import 'colors.scss';
-
 @keyframes Wiggle {
     0% {
         transform: rotate(0deg);
@@ -60,7 +57,7 @@
 }
 
 :host(.focused) {
-    border-color: color-lookup(focused);
+    border-color: var(--frame-tab-focused);
 }
 
 
@@ -71,7 +68,7 @@
     flex-shrink: 1;
     width: 100%;
     height: 100%;
-    border: .25rem solid color-lookup(frame, selected);
+    border: .25rem solid var(--frame-tab-selected);
     color: var(--text-fg);
     background-color: var(--text-bg);
     background-image: var(--text-bg-image);
@@ -80,7 +77,7 @@
     background-blend-mode: screen;
 
     :host(.focused) & {
-        border-color: color-lookup(focused, selected);
+        border-color: var(--frame-tab-focused-selected);
     }
 
 
@@ -96,10 +93,10 @@
 
 header {
     &:not(.no-title) {
-        background-color: color-lookup(frame, fade-50);
+        background-color: var(--frame-header);
 
         :host(.focused) & {
-            background-color: color-lookup(frame, focused, fade-50);
+            background-color: var(--frame-header-focused);
         }
     }
 
@@ -134,14 +131,15 @@ h1 {
     font: inherit;
     //font-size: 1rem;
     font-weight: normal;
-    color: color-lookup(pen, faded);
+    color: var(--frame-text-faded);
     text-transform: lowercase;
     display: flex;
     justify-content: space-between;
     ;
 
     :host(.focused) & {
-        color: color-lookup(pen);
+        color: var(--frame-text-faded);
+        ;
     }
 
     .title-left,
@@ -197,26 +195,26 @@ nav.tabs {
 
 button {
     background: inherit;
-    color: color-lookup(pen);
+    color: var(--frame-text);
     font: inherit;
     border: none;
     line-height: 100%;
     display: inline-block;
     font-size-adjust: none;
     padding: .25rem;
-    background-color: color-lookup(frame, selected);
+    background-color: var(--frame-tab-selected);
     pointer-events: auto;
 
     //cursor: pointer;
 
 
     :host(.focused) & {
-        background-color: color-lookup(frame, focused, selected);
+        background-color: var(--frame-tab-focused-selected);
     }
 
     &:disabled {
         //cursor: default !important;
-        color: color-lookup(pen, faded);
+        color: var(--frame-text-faded);
     }
 
     &:hover:enabled {
@@ -266,20 +264,20 @@ button {
         margin-left: 1rem;
     }
 
-    background-color: color-lookup(frame, defocus);
-    color: color-lookup(pen, faded);
+    background-color: var(--frame-tab);
+    color: var(--frame-text-faded);
 
     :host(.focused) & {
-        background-color: color-lookup(frame, focused, defocus);
+        background-color: var(--frame-tab-focused);
 
         &[aria-selected=true] {
-            background-color: color-lookup(frame, focused, selected);
+            background-color: var(--frame-tab-focused-selected);
         }
     }
 
     &[aria-selected=true] {
-        background-color: color-lookup(frame, selected);
-        color: color-lookup(pen);
+        background-color: var(--frame-tab-selected);
+        color: var(--frame-text);
         // margin-top: -.5rem;
         // padding-top: .375rem;
         z-index: 9;
@@ -299,7 +297,7 @@ button {
     }
 
     &.readonly {
-        color: color-lookup(pen, faded);
+        color: var(--frame-text-faded);
     }
 
 }

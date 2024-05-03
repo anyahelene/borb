@@ -1,0 +1,122 @@
+borb-sheet {
+    text-align: left;
+    border-collapse: collapse;
+
+    thead {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: #eee
+    }
+
+    thead tr {
+        th:not(.flush-right):not(.center) {
+            text-align: left;
+        }
+
+        th.flush-right {
+            text-align: right;
+        }
+
+        th.center {
+            text-align: center;
+        }
+
+        th:not(.no-sort) {
+            padding-right: 1em;
+        }
+
+        th:not(.no-sort):not(.flush-right) {
+            &::after {
+                content: "";
+                position: absolute;
+                width: 1em;
+                padding-left: .125em;
+            }
+
+            &:hover {
+                &:not(.sort-asc, .sort-desc)::after {
+                    opacity: 50%;
+                    content: "\0025Be";
+                }
+            }
+
+            &.sort-asc::after {
+                content: "\0025B4";
+            }
+
+            &.sort-desc::after {
+                content: "\0025Be";
+            }
+        }
+
+
+        th.flush-right:not(no-sort) {
+            &::before {
+                content: "";
+                position: absolute;
+                width: 1em;
+                padding-right: .125em;
+            }
+
+            &:hover {
+                &:not(.sort-asc, .sort-desc)::before {
+                    opacity: 50%;
+                    content: "\0025Be";
+                }
+            }
+
+            &.sort-asc::before {
+                content: "\0025B4";
+            }
+
+            &.sort-desc::before {
+                content: "\0025Be";
+            }
+        }
+    }
+
+
+    thead tr {
+        vertical-align: bottom;
+        position: sticky
+    }
+
+    tbody tr *:first-child {
+        text-align: right;
+        position: sticky
+    }
+
+
+    tfoot td {
+        text-align: left;
+        font-style: italic;
+        font-size: .9rem;
+    }
+
+    td[data-value] {
+        position: relative;
+    }
+
+    tr:hover td[data-value]::before {
+        color: #000
+    }
+
+    td[data-value]::before {
+        content: attr(data-value);
+        transform: translate(-50%, -50%);
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        font-family: monospace;
+        color: #0008;
+        z-index: 99
+    }
+
+    td[data-altvalue]::before {
+        content: attr(data-altvalue) !important;
+        width: 1em;
+        text-align: left
+    }
+
+}
