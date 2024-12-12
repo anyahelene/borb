@@ -87,7 +87,10 @@ borb-sheet {
         position: sticky
     }
 
-
+    tbody tr.removed {
+        opacity: 50%;
+    }
+    
     tfoot td {
         text-align: left;
         font-style: italic;

@@ -1,4 +1,4 @@
-import { Borb } from '.';
+//import { Borb } from '.';
 import type { BorbContainer, BorbElement } from './BaseElement';
 
 export const borbName = 'borb';

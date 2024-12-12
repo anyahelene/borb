@@ -122,11 +122,13 @@ export class BorbButton extends BorbBaseElement {
     static tag = tagName('button');
     _command?: Command;
     clickHandler: (e: Event) => Promise<void>;
+    changeHandler: (e: Event) => Promise<void>;
     constructor() {
         super(['css/common.css', styleRef]);
         this.attachShadow({ mode: 'open' });
 
         this.clickHandler = this._clickHandler.bind(this);
+        this.changeHandler = this._changeHandler.bind(this);
         this.addEventListener('borbdragstart', (ev: BorbDragEvent) => {
             ev.originalEvent.dataTransfer.setData('text/plain', this.outerHTML);
             ev.originalEvent.dataTransfer.setData(
@@ -141,7 +143,7 @@ export class BorbButton extends BorbBaseElement {
     }
 
     static get observedAttributes() {
-        return ['class'];
+        return ['class', 'data-reverse', 'data-text', 'data-icon', 'data-status', 'type', 'checked'];
     }
 
     set command(cmd: Command) {
@@ -158,7 +160,8 @@ export class BorbButton extends BorbBaseElement {
             const elt = document.querySelector(
                 `${BorbCommand.tag}[data-bind="${this.id}"]`,
             ) as BorbCommand;
-            cmd = loadCommand(elt);
+            if (elt)
+                cmd = loadCommand(elt);
         }
         return (
             cmd || {
@@ -169,39 +172,80 @@ export class BorbButton extends BorbBaseElement {
         );
     }
 
+    get checked() {
+        if (this.getAttribute('type') === 'switch') {
+            return (this.shadowRoot.querySelector('input') as HTMLInputElement)?.checked;
+        } else {
+            return false;
+        }
+    }
+    set checked(checked: boolean) {
+        if (this.getAttribute('type') === 'switch') {
+            const elt = (this.shadowRoot.querySelector('input') as HTMLInputElement);
+            const old = elt.checked;
+            elt.checked = checked;
+            if (old !== checked) {
+                 this.toggleAttribute('checked', checked);
+            //     queueMicrotask(() => this.dispatchEvent(new Event('change')))
+            }
+        }
+    }
+
+    get name() {
+        return this.getAttribute('name');
+    }
     async _clickHandler(e: Event) {
         if (this.classList.contains('disabled')) {
             console.warn('click on disabled button: ', this);
             return;
         }
+        console.log(e)
+        if (this.getAttribute('type') === 'switch') {
+            const checked = (this.shadowRoot.querySelector('input') as HTMLInputElement).checked;
+            console.log("_clickHandler checked", checked)
+            this.toggleAttribute('checked', checked);
+        }
         /*
-		const active = this.classList.contains('active');
-		this.classList.add('active');
+        const active = this.classList.contains('active');
+        this.classList.add('active');
 
-		// visual effect
-		if (typeof this.timeoutId == "number") {
-			window.clearTimeout(this.timeoutId);
-		}
-		this.timeoutId = window.setTimeout(() =>  {
-			this.timeoutId = undefined;
-			this.classList.remove('active');
-		}, 300);
+        // visual effect
+        if (typeof this.timeoutId == "number") {
+            window.clearTimeout(this.timeoutId);
+        }
+        this.timeoutId = window.setTimeout(() =>  {
+            this.timeoutId = undefined;
+            this.classList.remove('active');
+        }, 300);
 
-		if (!active) { // debounce
-			*/
+        if (!active) { // debounce
+            */
         await this.run(e);
         //}
     }
-
+    async _changeHandler(e: Event) {
+        const checked = (this.shadowRoot.querySelector('input') as HTMLInputElement).checked;
+        console.log("_changeHandler checked", checked)
+        this.toggleAttribute('checked', checked);
+        await this.run(e);
+    }
     async run(e: Event) {
+        if (e.type === 'change') {
+            if (!this.dispatchEvent(new Event('change')))
+                return;
+
+        } else if (e.type === 'click') {
+            if (!this.dispatchEvent(new Event('click')))
+                return;
+        }
         const cmd = this.command;
         if (cmd) {
             //  if(_self._debug) console.log("Run command", cmd, "button", this, "event", e);
             if (cmd.element) {
                 await cmd.element.run(this, e);
-            } else {
+            } else if (cmd.name) {
                 await handleKey(cmd.name, this, e);
-            }
+            } 
         } else {
             console.warn('No command bound to ', this, e);
             await handleKey(this.id, this, e);
@@ -226,10 +270,20 @@ export class BorbButton extends BorbBaseElement {
                 oldValue,
                 newValue,
             );
+        if (name === 'checked') {
+            const checked = newValue !== null;
+            console.log('attribute changed', name, oldValue, newValue, this.checked, '==', checked)
+            if (this.checked !== checked)
+                this.checked = checked;
+            return;
+        } else if(name === 'data-status') {
+            (this.shadowRoot.querySelector('input') as HTMLInputElement).disabled = newValue === 'pending' || newValue === 'disabled';
+        }
         this.update();
     }
 
     template() {
+        console.log('redraw, checked=', this.checked);
         const command = this.command;
         const text = command.text;
         let icon: string | Hole = command.icon || this.dataset.icon || '';
@@ -246,16 +300,17 @@ export class BorbButton extends BorbBaseElement {
             .split('+')
             .map((s) => html`<span>${keyboardSymbols[s] || s}</span>`);
 
-        const classList = `${icon ? 'has-icon' : 'no-icon'} ${
-            text ? 'has-text' : 'no-text'
-        }`;
+        const classList = `${icon ? 'has-icon' : 'no-icon'} ${text ? 'has-text' : 'no-text'
+            }`;
 
         this.dataset.currentBinding = command.name;
         if (shortcut && shortcut !== '(not implemented)')
             Mousetrap.bindGlobal(shortcut, this.clickHandler);
 
         // if(_self._debug)  console.log(this.id, command, icon, shortcut, shortcutText, keys);
-        return html`${this.styles}
+        const type = this.getAttribute('type') || 'button';
+        if (type === 'button') {
+            return html`${this.styles}
             <button
                 id="${this.id}"
                 onclick=${this.clickHandler}
@@ -266,6 +321,19 @@ export class BorbButton extends BorbBaseElement {
                 ><span class="text">${command.text}</span>
                 <div class="shortcut">${keys}</div>
             </button> `;
+        } else if (type === 'switch') {
+            return html`${this.styles}
+            <div class="switch">
+            <label for=${this.id}>${command.text}</label>
+            <input type="checkbox"
+            id=${this.id}
+            onchange=${this.changeHandler}
+            class=${classList + ' switch'}
+            .checked=${this.hasAttribute('checked')}>
+            </div>
+            </input>
+            `
+        }
     }
 
     update() {

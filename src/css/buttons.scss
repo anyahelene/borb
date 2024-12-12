@@ -4,7 +4,7 @@
 :host {
     position: relative;
     display: inline-block;
-
+    vertical-align: middle;
     &[hidden] {
         display: none;
     }
@@ -149,4 +149,87 @@ button:hover .shortcut {
     display: block;
     opacity: 100%;
     z-index: 12;
+}
+
+input.switch {
+    font-family: inherit;
+    width: 2.75em;
+    height: 1.2em;
+    appearance: none;
+    border-radius: 1em;
+    margin: .2em .4em;
+    border-width: .1em;
+    position:relative;
+    display: inline-block;
+    border-color:inherit;
+    background-color: #fff;
+    //border-style: solid;
+    &.three-dee {
+        border-style:inset;
+    }
+    &:checked {
+        &::before {
+            left:100%; 
+            transform:translate(-100%,0);
+            background-color: #22f;
+            border-color: #88f;
+
+            //border-color: #66f;
+        }
+        &::after {
+            right:1%;
+            background-color: #88f;
+        }
+    }
+    &::before {
+        content:" ";
+        vertical-align: middle;
+        text-align: center;
+        line-height: 1em;
+        width: 50%;
+        height:100%;
+        background-color: #888;
+        border-color: #fff;
+        border-radius: 1em;
+        border-width: .1em;
+        border-style: solid;
+        &.three-dee {
+            border-style:outset;
+        }
+        position: absolute;
+        left:0%;
+        transition: all .25s;
+        z-index:2;
+        //margin: .1em .05em;
+    }
+    &::after {
+        content: " ";
+        position:absolute;
+        background-color: #88f0;
+        transition: all .3s;
+        border-radius: 1em;
+        z-index: 1;
+        //margin: -.15em;
+        left:0;
+        top:0;
+        bottom:0;
+        right:70%;
+    }
+    :host([disabled]) & {
+        opacity: 50%;
+    }
+}
+
+:host([data-reverse]) div.switch {
+    flex-direction: row-reverse;
+}
+div.switch {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    
+    * {
+        vertical-align: middle;
+    }
 }

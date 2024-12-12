@@ -21,11 +21,11 @@ interface StylesData {
 export const data: StylesData = previousVersion
     ? { ...previousVersion.data }
     : {
-          styles: new Map<string, string>(),
-          styleNodes: new Map<string, HTMLStyleElement>(),
-          styleStatus: new Map<string, string>(),
-          styleClones: new Map<string, Map<HTMLElement, HTMLStyleElement>>(),
-      };
+        styles: new Map<string, string>(),
+        styleNodes: new Map<string, HTMLStyleElement>(),
+        styleStatus: new Map<string, string>(),
+        styleClones: new Map<string, Map<HTMLElement, HTMLStyleElement>>(),
+    };
 export function attach(name: string, listener: (ev: Event) => void): void {
     let node = data.styleNodes.get(name);
     if (!node) {
@@ -75,15 +75,14 @@ export function getStyleFor(
         clones.set(elt, clone);
     }
     if (_self._debug)
-        console.log('getting style %s for %o: %o', name, elt, clone);
+        console.log('Styles: getting style %s for %o: %o', name, elt, clone);
     return clone;
 }
 export function disposeStyle(elt: HTMLElement, name: string): HTMLStyleElement {
     const clones = data.styleClones.get(name);
     if (clones) {
         if (_self._debug)
-            console.log(
-                'disposing of style %s for %o: %o',
+            console.log('Styles: disposing of style %s for %o: %o',
                 name,
                 elt,
                 clones.get(elt),
@@ -101,8 +100,7 @@ export function refreshClones(name: string, node: HTMLStyleElement) {
     if (clones) {
         clones.forEach((clone, elt) => {
             if (_self._debug)
-                console.log(
-                    'updating style %s for %o, style element %o',
+                console.log('Styles: updating style %s for %o, style element %o',
                     name,
                     elt,
                     clone,
@@ -146,7 +144,9 @@ export function load(
         headers.append('pragma', 'no-cache');
         headers.append('cache-control', 'no-cache');
     }
-    fetch(name, {
+    if (_self._debug)
+        console.log('Styles: fetching ', _self.pathPrefix + name, headers)
+    fetch(_self.pathPrefix + name, {
         method: 'GET',
         headers,
     })
@@ -160,7 +160,7 @@ export function load(
                 node.dispatchEvent(new Event('change'));
             } else {
                 console.warn(
-                    `Fetching '${name}': `,
+                    `Styles: Fetching '${name}': `,
                     resp.status,
                     resp.statusText,
                 );
@@ -169,7 +169,7 @@ export function load(
         })
         .catch((reason) => {
             data.styleStatus.set(name, 'error');
-            console.error(`Fetching '${name}': `, name, reason);
+            console.error(`Styles: Fetching '${name}': `, name, reason);
         });
 
     return node;
@@ -192,7 +192,8 @@ export function update(name: string): void {
 const _self = {
     _id: sysId(import.meta.url),
     _revision: revision,
-    _debug: false,
+    _debug: true,
+    pathPrefix : '',
     get,
     getStyleFor,
     disposeStyle,
