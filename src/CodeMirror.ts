@@ -11,6 +11,14 @@ import {
     showPanel,
     hoverTooltip,
     DecorationSet,
+    crosshairCursor,
+    drawSelection,
+    dropCursor,
+    highlightActiveLine,
+    highlightActiveLineGutter,
+    highlightSpecialChars,
+    lineNumbers,
+    rectangularSelection,
 } from '@codemirror/view';
 import {
     EditorState,
@@ -30,7 +38,10 @@ import {
     indentMore,
     indentLess,
     insertNewlineAndIndent,
+    history,
     historyField,
+    defaultKeymap,
+    historyKeymap,
 } from '@codemirror/commands';
 import {
     syntaxTree,
@@ -39,25 +50,41 @@ import {
     IndentContext,
     LanguageSupport,
     StreamLanguage,
+    bracketMatching,
+    defaultHighlightStyle,
+    foldGutter,
+    foldKeymap,
+    indentOnInput,
+    syntaxHighlighting,
 } from '@codemirror/language';
 import {
     autocompletion,
+    closeBrackets,
+    closeBracketsKeymap,
+    completionKeymap,
     completionStatus,
     currentCompletions,
     prevSnippetField,
 } from '@codemirror/autocomplete';
+import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import { StyleModule } from 'style-mod';
-import { basicSetup } from 'codemirror';
 import { java } from '@codemirror/lang-java';
 import { cpp } from '@codemirror/lang-cpp';
 import { python } from '@codemirror/lang-python';
 import { html } from '@codemirror/lang-html';
-import { markdown, insertNewlineContinueMarkup } from '@codemirror/lang-markdown';
+import {
+    markdown,
+    insertNewlineContinueMarkup,
+} from '@codemirror/lang-markdown';
 import { css } from '@codemirror/lang-css';
 import { z80 } from '@codemirror/legacy-modes/mode/z80';
 import { shell } from '@codemirror/legacy-modes/mode/shell';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { darkDuck, darkDuckHighlightSpec, darkDuckHighlighter } from './themes/dark-duck';
+import {
+    darkDuck,
+    darkDuckHighlightSpec,
+    darkDuckHighlighter,
+} from './themes/dark-duck';
 import {
     closeLintPanel,
     lintKeymap,
@@ -114,7 +141,33 @@ class PromptWidget extends WidgetType {
 
 export function stdConfig() {
     return [
-        basicSetup,
+        lineNumbers(), // default
+        highlightActiveLineGutter(), // default
+        highlightSpecialChars(), // default
+        history(), // default
+        foldGutter(), // default
+        drawSelection(), // default
+        dropCursor(), // default
+        EditorState.allowMultipleSelections.of(true), // default
+        indentOnInput(), // default
+        syntaxHighlighting(defaultHighlightStyle, { fallback: true }), // default
+        bracketMatching(), // default
+        closeBrackets(), // default
+        autocompletion(), // default
+        rectangularSelection(), // default
+        crosshairCursor(), // default
+        highlightActiveLine(), // default
+        highlightSelectionMatches(), // default
+        keymap.of([
+            // default
+            ...closeBracketsKeymap, // default
+            ...defaultKeymap, // default
+            ...searchKeymap, // default
+            ...historyKeymap, // default
+            ...foldKeymap, // default
+            ...completionKeymap, // default
+            ...lintKeymap, // default
+        ]),
         EditorState.tabSize.of(4),
         markKeymap,
         keymap.of([{ key: 'Tab', run: indentMore, shift: indentLess }]),
@@ -172,7 +225,8 @@ export function langConfig(lang: string) {
 }
 export function fontConfig(elt: HTMLElement) {
     let fontFamily = window.getComputedStyle(elt).fontFamily;
-    if (!fontFamily) fontFamily = window.getComputedStyle(document.body).fontFamily;
+    if (!fontFamily)
+        fontFamily = window.getComputedStyle(document.body).fontFamily;
     const myFontTheme = EditorView.theme({
         '.cm-scroller': {
             fontFamily: 'inherit',
@@ -302,7 +356,11 @@ export function highlightTree(state: EditorState, prompt: HTMLElement) {
         else if (cls2 == null) return cls1;
         else return cls1 + ' ' + cls2;
     }
-    Highlight.highlightTree(tree, [darkDuckHighlighter, Highlight.classHighlighter], hilight);
+    Highlight.highlightTree(
+        tree,
+        [darkDuckHighlighter, Highlight.classHighlighter],
+        hilight,
+    );
     //	join(darkDuckHighlightStyle.match(tag, scope), classHighlightStyle.match(tag, scope)), highlight);
     nolight(doc.length);
     console.log('line', line, 'result', result);
@@ -351,7 +409,10 @@ declare module 'style-mod' {
 }
 // for each style rule, split, e.g., ".ͼu {color: #cc0;}" into ".ͼu": "{color: #cc0;}"
 darkDuckHighlighter.module.rules.forEach((rule: string) => {
-    highlight.darkDuckStyle[rule.replace(/\s*{.*$/, '')] = rule.replace(/^[^{]*{/, '{');
+    highlight.darkDuckStyle[rule.replace(/\s*{.*$/, '')] = rule.replace(
+        /^[^{]*{/,
+        '{',
+    );
 });
 // build definitions for classHighlighter css classes based on defs from darkDuckHighlighter
 console.groupCollapsed('editor styles');
@@ -361,7 +422,8 @@ for (const tag in Highlight.tags) {
         const ddStyleClass = '.' + darkDuckHighlighter.style([t]);
         const clsStyleClass = '.' + Highlight.classHighlighter.style([t]);
         console.log(ddStyleClass, clsStyleClass);
-        highlight.classStyle[clsStyleClass] = highlight.darkDuckStyle[ddStyleClass] || '{}';
+        highlight.classStyle[clsStyleClass] =
+            highlight.darkDuckStyle[ddStyleClass] || '{}';
     }
 }
 console.groupEnd();
