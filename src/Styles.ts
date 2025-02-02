@@ -21,11 +21,11 @@ interface StylesData {
 export const data: StylesData = previousVersion
     ? { ...previousVersion.data }
     : {
-        styles: new Map<string, string>(),
-        styleNodes: new Map<string, HTMLStyleElement>(),
-        styleStatus: new Map<string, string>(),
-        styleClones: new Map<string, Map<HTMLElement, HTMLStyleElement>>(),
-    };
+          styles: new Map<string, string>(),
+          styleNodes: new Map<string, HTMLStyleElement>(),
+          styleStatus: new Map<string, string>(),
+          styleClones: new Map<string, Map<HTMLElement, HTMLStyleElement>>(),
+      };
 export function attach(name: string, listener: (ev: Event) => void): void {
     let node = data.styleNodes.get(name);
     if (!node) {
@@ -82,7 +82,8 @@ export function disposeStyle(elt: HTMLElement, name: string): HTMLStyleElement {
     const clones = data.styleClones.get(name);
     if (clones) {
         if (_self._debug)
-            console.log('Styles: disposing of style %s for %o: %o',
+            console.log(
+                'Styles: disposing of style %s for %o: %o',
                 name,
                 elt,
                 clones.get(elt),
@@ -100,7 +101,8 @@ export function refreshClones(name: string, node: HTMLStyleElement) {
     if (clones) {
         clones.forEach((clone, elt) => {
             if (_self._debug)
-                console.log('Styles: updating style %s for %o, style element %o',
+                console.log(
+                    'Styles: updating style %s for %o, style element %o',
                     name,
                     elt,
                     clone,
@@ -145,14 +147,17 @@ export function load(
         headers.append('cache-control', 'no-cache');
     }
     if (_self._debug)
-        console.log('Styles: fetching ', _self.pathPrefix + name, headers)
+        console.log('Styles: fetching ', _self.pathPrefix + name, headers);
     fetch(_self.pathPrefix + name, {
         method: 'GET',
         headers,
     })
         .then(async (resp) => {
             if (resp.ok) {
-                const txt = await resp.text();
+                const txt = (await resp.text()).replace(
+                    /sourceMappingURL=.*\.map/,
+                    `sourceMappingURL=${_self.pathPrefix}${name}.map`,
+                );
                 data.styles.set(name, txt);
                 data.styleStatus.set(name, 'loaded');
                 node.textContent = txt;
@@ -193,7 +198,7 @@ const _self = {
     _id: sysId(import.meta.url),
     _revision: revision,
     _debug: true,
-    pathPrefix : '',
+    pathPrefix: '',
     get,
     getStyleFor,
     disposeStyle,

@@ -18,11 +18,9 @@
     width: 100%;
     font-size: 1.4rem;
     color: var(--text-fg);
-
-    &[hidden] {
-        display: none;
-    }
-
+}
+:host(hidden) {
+    display: none;
 }
 
 :host(.focused) .cm-cursor {
